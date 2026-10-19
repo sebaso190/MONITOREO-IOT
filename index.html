@@ -4,27 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitor Eléctrico IoT</title>
+    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Chart.js para las gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: system-ui, sans-serif; background: #f4f4f9; padding: 20px; margin: 0; }
-        .tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; }
-        .tab-btn { padding: 10px 20px; cursor: pointer; background: #ddd; border: none; border-radius: 5px; font-weight: bold; }
+        .tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
+        .tab-btn { padding: 10px 20px; cursor: pointer; background: #ddd; border: none; border-radius: 5px; font-weight: bold; transition: 0.3s; }
+        .tab-btn:hover { background: #ccc; }
         .tab-btn.active { background: #007bff; color: white; }
         .view { display: none; }
         .view.active { display: block; }
         
-        /* Tarjetas Tiempo Real */
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; max-width: 800px; margin: 0 auto; }
+        /* Tarjetas */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; max-width: 1000px; margin: 0 auto; }
         .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
         .valor { font-size: 2em; font-weight: bold; color: #007bff; margin: 10px 0; }
         .unidad { font-size: 0.9em; color: #666; }
         .status { text-align: center; margin-bottom: 20px; color: #28a745; font-weight: bold; }
         
-        /* Tabla Histórico */
+        /* Tabla */
         .table-container { max-width: 1000px; margin: 0 auto; overflow-x: auto; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; text-align: center; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9em; }
         th, td { padding: 12px; border-bottom: 1px solid #ddd; }
         th { background-color: #f8f9fa; color: #333; }
+        
+        /* Contenedor de gráficas para mantener proporción */
+        .chart-container { position: relative; width: 100%; height: 250px; }
     </style>
 </head>
 <body>
@@ -32,60 +39,111 @@
     <h1 style="text-align: center;">Monitor de Energía IoT</h1>
     
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('realtime')">Tiempo Real</button>
-        <button class="tab-btn" onclick="switchTab('history')">Historial de Lecturas</button>
+        <button class="tab-btn active" onclick="switchTab('realtime', event)">Tiempo Real</button>
+        <button class="tab-btn" onclick="switchTab('history', event)">Historial de Lecturas</button>
+        <button class="tab-btn" onclick="switchTab('charts', event)">Gráficas</button>
     </div>
 
     <div id="conexion-status" class="status">Conectando a la base de datos...</div>
 
-    <!-- Vista Tiempo Real -->
+    <!-- 1. Vista Tiempo Real -->
     <div id="realtime" class="view active">
         <div class="grid">
-            <div class="card"><h3>Voltaje</h3><div class="valor" id="val-voltaje">0</div><div class="unidad">Voltios (V)</div></div>
-            <div class="card"><h3>Corriente</h3><div class="valor" id="val-corriente">0</div><div class="unidad">Amperios (A)</div></div>
-            <div class="card"><h3>Potencia</h3><div class="valor" id="val-potencia">0</div><div class="unidad">Vatios (W)</div></div>
+            <div class="card"><h3>Voltaje</h3><div class="valor" id="val-voltaje">0</div><div class="unidad">V</div></div>
+            <div class="card"><h3>Corriente</h3><div class="valor" id="val-corriente">0</div><div class="unidad">A</div></div>
+            <div class="card"><h3>Potencia</h3><div class="valor" id="val-potencia">0</div><div class="unidad">W</div></div>
             <div class="card"><h3>Energía</h3><div class="valor" id="val-energia">0</div><div class="unidad">kWh</div></div>
             <div class="card"><h3>Frecuencia</h3><div class="valor" id="val-frecuencia">0</div><div class="unidad">Hz</div></div>
             <div class="card"><h3>Factor Potencia</h3><div class="valor" id="val-pf">0</div><div class="unidad">PF</div></div>
         </div>
     </div>
 
-    <!-- Vista Historial -->
+    <!-- 2. Vista Historial -->
     <div id="history" class="view">
         <div class="table-container">
             <table id="tabla-historico">
                 <thead>
                     <tr>
-                        <th>Fecha</th>
-                        <th>Hora</th>
-                        <th>Voltaje (V)</th>
-                        <th>Corriente (A)</th>
-                        <th>Potencia (W)</th>
-                        <th>Energía (kWh)</th>
-                        <th>Frec. (Hz)</th>
-                        <th>FP</th>
+                        <th>Fecha</th><th>Hora</th><th>Voltaje (V)</th><th>Corriente (A)</th>
+                        <th>Potencia (W)</th><th>Energía (kWh)</th><th>Frec. (Hz)</th><th>FP</th>
                     </tr>
                 </thead>
-                <tbody id="tabla-body">
-                    <!-- Las filas se insertarán aquí por JS -->
-                </tbody>
+                <tbody id="tabla-body"></tbody>
             </table>
         </div>
     </div>
 
+    <!-- 3. Vista Gráficas -->
+    <div id="charts" class="view">
+        <div class="grid">
+            <div class="card"><h3>Voltaje (V)</h3><div class="chart-container"><canvas id="grafico-voltaje"></canvas></div></div>
+            <div class="card"><h3>Corriente (A)</h3><div class="chart-container"><canvas id="grafico-corriente"></canvas></div></div>
+            <div class="card"><h3>Potencia (W)</h3><div class="chart-container"><canvas id="grafico-potencia"></canvas></div></div>
+            <div class="card"><h3>Energía (kWh)</h3><div class="chart-container"><canvas id="grafico-energia"></canvas></div></div>
+            <div class="card"><h3>Frecuencia (Hz)</h3><div class="chart-container"><canvas id="grafico-frecuencia"></canvas></div></div>
+            <div class="card"><h3>Factor Potencia</h3><div class="chart-container"><canvas id="grafico-pf"></canvas></div></div>
+        </div>
+    </div>
+
     <script>
+        // --- Credenciales ---
         const SUPABASE_URL = 'https://jhhwfpdirkqknuepqpzv.supabase.co';
-        // Esta clave pública es correcta para la web
         const SUPABASE_KEY = 'sb_publishable_bWL26c7cp7NEhc_6odLRKg_4inoIAuM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const statusDiv = document.getElementById('conexion-status');
 
+        // --- Variables Globales ---
+        const MAX_DATAPOINTS = 30; // Mostrar solo las últimas 30 lecturas en la gráfica
+        const charts = {}; // Objeto para guardar las instancias de Chart.js
+
         // --- Control de Pestañas ---
-        function switchTab(tabId) {
+        function switchTab(tabId, event) {
             document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
+            if(event) event.target.classList.add('active');
+        }
+
+        // --- Inicialización de Gráficos (Chart.js) ---
+        function inicializarGraficos() {
+            const configBase = {
+                type: 'line',
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    animation: { duration: 400 },
+                    scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } } },
+                    plugins: { legend: { display: false } }
+                }
+            };
+
+            const crearConfig = (color) => JSON.parse(JSON.stringify({...configBase, data: { labels: [], datasets: [{ data: [], borderColor: color, backgroundColor: color + '33', fill: true, tension: 0.4 }] }}));
+
+            charts.voltaje = new Chart(document.getElementById('grafico-voltaje'), crearConfig('#007bff'));
+            charts.corriente = new Chart(document.getElementById('grafico-corriente'), crearConfig('#dc3545'));
+            charts.potencia = new Chart(document.getElementById('grafico-potencia'), crearConfig('#ffc107'));
+            charts.energia = new Chart(document.getElementById('grafico-energia'), crearConfig('#28a745'));
+            charts.frecuencia = new Chart(document.getElementById('grafico-frecuencia'), crearConfig('#17a2b8'));
+            charts.pf = new Chart(document.getElementById('grafico-pf'), crearConfig('#6f42c1'));
+        }
+
+        // --- Agregar Datos a los Gráficos ---
+        function actualizarGrafico(hora, datos) {
+            // Actualizar los valores en cada gráfico
+            const mapeo = { voltaje: 'voltaje', corriente: 'corriente', potencia: 'potencia', energia: 'energia', frecuencia: 'frecuencia', pf: 'factor_potencia' };
+            
+            for (let key in charts) {
+                const chart = charts[key];
+                chart.data.labels.push(hora);
+                chart.data.datasets[0].data.push(datos[mapeo[key]]);
+                
+                // Si excede el máximo, eliminar el más viejo (desplazamiento a la izquierda)
+                if (chart.data.labels.length > MAX_DATAPOINTS) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+                chart.update();
+            }
         }
 
         // --- Renderizar una fila en la tabla ---
@@ -103,30 +161,38 @@
                 <td>${datos.frecuencia}</td>
                 <td>${datos.factor_potencia}</td>
             `;
-            if(prepend) {
-                tbody.prepend(fila); // Insertar arriba si es un dato nuevo
-            } else {
-                tbody.appendChild(fila); // Insertar abajo al cargar histórico
-            }
+            prepend ? tbody.prepend(fila) : tbody.appendChild(fila);
         }
 
-        // --- Cargar Historial Inicial (Últimas 50 mediciones) ---
+        // --- Cargar Historial Inicial ---
         async function cargarHistorial() {
+            inicializarGraficos(); // Crear los canvas vacíos primero
+            
             const { data, error } = await supabaseClient
                 .from('mediciones')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(50);
+                .limit(MAX_DATAPOINTS); // Traer la misma cantidad que soporta la gráfica
             
-            if (data) {
+            if (data && data.length > 0) {
+                // Para la tabla: los más nuevos van arriba
                 data.forEach(medicion => crearFila(medicion));
+                
+                // Para las gráficas: necesitamos orden cronológico (de izquierda a derecha), así que invertimos el arreglo temporalmente
+                const datosCronologicos = [...data].reverse();
+                datosCronologicos.forEach(medicion => {
+                    const hora = new Date(medicion.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                    actualizarGrafico(hora, medicion);
+                });
             }
         }
 
-        // --- Suscripción a Tiempo Real ---
+        // --- Recepción de Datos en Tiempo Real ---
         function actualizarUI(payload) {
             const datos = payload.new;
-            // Actualizar tarjetas
+            const horaStr = new Date(datos.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+            
+            // 1. Actualizar Tarjetas Grandes
             document.getElementById('val-voltaje').innerText = datos.voltaje;
             document.getElementById('val-corriente').innerText = datos.corriente;
             document.getElementById('val-potencia').innerText = datos.potencia;
@@ -134,12 +200,16 @@
             document.getElementById('val-frecuencia').innerText = datos.frecuencia;
             document.getElementById('val-pf').innerText = datos.factor_potencia;
             
-            // Agregar el nuevo dato a la tabla histórica inmediatamente
+            // 2. Agregar a la Tabla (arriba)
             crearFila(datos, true);
             
-            statusDiv.innerText = "Última actualización: " + new Date().toLocaleTimeString();
+            // 3. Agregar a las Gráficas
+            actualizarGrafico(horaStr, datos);
+            
+            statusDiv.innerText = "Última actualización: " + horaStr;
         }
 
+        // Suscripción al WebSocket de Supabase
         const subscription = supabaseClient
             .channel('mediciones-channel')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, payload => {
@@ -147,11 +217,11 @@
             })
             .subscribe((status) => {
                 if(status === 'SUBSCRIBED') {
-                    statusDiv.innerText = "Conectado. Recibiendo datos cada 5 segundos...";
+                    statusDiv.innerText = "Conectado. Recibiendo datos...";
                 }
             });
 
-        // Iniciar la carga de la tabla al abrir la página
+        // Arrancar todo al cargar
         cargarHistorial();
     </script>
 </body>
