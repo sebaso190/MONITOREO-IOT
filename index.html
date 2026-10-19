@@ -4,8 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitor Eléctrico IoT</title>
+    
+    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Chart.js y Plugins para hacer Zoom y Desplazamiento (Pan) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+
     <style>
         body { font-family: system-ui, sans-serif; background: #f4f4f9; padding: 15px; margin: 0; }
         .tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
@@ -27,21 +34,48 @@
         .btn-filter { padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-clear { padding: 8px 15px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         
-        /* Tabla Histórico y Paginación */
+        /* Tabla Histórico */
         .table-container { max-width: 1000px; margin: 0 auto; overflow-x: auto; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9em; min-width: 600px; }
         th, td { padding: 12px; border-bottom: 1px solid #ddd; }
         th { background-color: #f8f9fa; color: #333; }
-        .pagination { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 15px; }
-        .btn-page { padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .btn-page:disabled { background: #ccc; cursor: not-allowed; }
         
+        /* PAGINACIÓN ESTILO CONSOLA OSCURA */
+        .pagination-dark {
+            background: #1e1e1e; color: #e0e0e0; max-width: 1000px; margin: 15px auto 0 auto;
+            display: flex; align-items: center; justify-content: flex-start; gap: 12px;
+            padding: 12px 20px; border-radius: 8px; font-size: 14px; flex-wrap: wrap;
+        }
+        .btn-icon {
+            background: transparent; color: #e0e0e0; border: 1px solid #444; border-radius: 6px;
+            width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: 0.2s; font-size: 16px;
+        }
+        .btn-icon:hover:not(:disabled) { background: #333; border-color: #666; }
+        .btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
+        .page-input {
+            background: #111; color: #fff; border: 1px solid #444; border-radius: 6px;
+            width: 40px; text-align: center; padding: 6px; font-weight: bold; outline: none;
+        }
+        .page-input:focus { border-color: #007bff; }
+        .rows-select {
+            background: #111; color: #fff; border: 1px solid #444; border-radius: 6px;
+            padding: 6px 10px; cursor: pointer; font-weight: bold; outline: none; margin-left: 10px;
+        }
+        .records-info { color: #888; margin-left: 15px; }
+
         /* Gráficas */
-        .chart-controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        .chart-controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
         .btn-chart { padding: 8px 15px; background: #e9ecef; border: 1px solid #ccc; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .btn-chart.active { background: #343a40; color: white; border-color: #343a40; }
+        
+        .time-controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        .btn-time { padding: 6px 12px; background: #fff; border: 1px solid #007bff; color: #007bff; border-radius: 5px; cursor: pointer; font-size: 0.9em; font-weight: bold; }
+        .btn-time.active { background: #007bff; color: white; }
+
         .chart-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 1000px; margin: 0 auto; }
         .chart-wrapper { position: relative; width: 100%; height: 60vh; min-height: 400px; }
+        .grafica-hint { text-align: center; color: #888; font-size: 0.8em; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -68,7 +102,7 @@
         </div>
     </div>
 
-    <!-- Vista 2: Historial con Filtros -->
+    <!-- Vista 2: Historial con Filtros y Paginación Oscura -->
     <div id="history" class="view">
         <div class="filter-bar">
             <label>Fecha:</label>
@@ -100,14 +134,27 @@
                 <tbody id="tabla-body"></tbody>
             </table>
         </div>
-        <div class="pagination">
-            <button class="btn-page" id="btn-prev" onclick="cambiarPagina(-1)">Anterior</button>
-            <span id="page-info" style="font-weight: bold;">Página 1</span>
-            <button class="btn-page" id="btn-next" onclick="cambiarPagina(1)">Siguiente</button>
+        
+        <!-- Paginación Estilo Consola Oscura -->
+        <div class="pagination-dark">
+            <button class="btn-icon" id="btn-prev" onclick="cambiarPagina(-1)">←</button>
+            <span>Página</span>
+            <input type="number" id="input-page" class="page-input" value="1" min="1" onchange="irAPagina(this.value)">
+            <span id="total-pages-info">de 1</span>
+            <button class="btn-icon" id="btn-next" onclick="cambiarPagina(1)">→</button>
+            
+            <select id="select-rows" class="rows-select" onchange="cambiarFilas()">
+                <option value="20">20 filas</option>
+                <option value="50">50 filas</option>
+                <option value="100">100 filas</option>
+                <option value="500">500 filas</option>
+            </select>
+            
+            <span class="records-info" id="total-records-info">0 registros</span>
         </div>
     </div>
 
-    <!-- Vista 3: Gráfica Dinámica Gigante -->
+    <!-- Vista 3: Gráfica Dinámica Gigante con Scroll y Tiempos -->
     <div id="charts" class="view">
         <div class="chart-controls">
             <button class="btn-chart active" onclick="cambiarParametroGrafico('voltaje', event)">Voltaje</button>
@@ -117,9 +164,20 @@
             <button class="btn-chart" onclick="cambiarParametroGrafico('frecuencia', event)">Frecuencia</button>
             <button class="btn-chart" onclick="cambiarParametroGrafico('factor_potencia', event)">Factor de Potencia</button>
         </div>
+        
+        <div class="time-controls">
+            <button class="btn-time active" onclick="cambiarRangoTiempo('realtime', event)">Tiempo Real (Últimos 60)</button>
+            <button class="btn-time" onclick="cambiarRangoTiempo('dia', event)">1 Día</button>
+            <button class="btn-time" onclick="cambiarRangoTiempo('mes', event)">1 Mes</button>
+            <button class="btn-time" onclick="cambiarRangoTiempo('ano', event)">1 Año</button>
+        </div>
+
         <div class="chart-card">
             <div class="chart-wrapper">
                 <canvas id="canvas-principal"></canvas>
+            </div>
+            <div class="grafica-hint">
+                💡 <b>Consejo:</b> Puedes hacer clic y arrastrar horizontalmente sobre la gráfica para explorar fechas anteriores, o usar la rueda del ratón para hacer zoom.
             </div>
         </div>
     </div>
@@ -130,18 +188,21 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const statusDiv = document.getElementById('conexion-status');
 
-        // Variables de Estado
+        // Variables de Estado para Paginación
         let paginaActual = 1;
-        const REGISTROS_POR_PAGINA = 20;
+        let REGISTROS_POR_PAGINA = 20;
+        let totalRegistros = 0;
+        let totalPaginas = 1;
         
         // Estado de los Filtros
         let fFecha = '';
         let fParam = 'created_at';
         let fOrdenDesc = true;
 
+        // Variables para Gráficas
         let graficoPrincipal;
         let parametroGrafico = 'voltaje';
-        const MAX_CHART_POINTS = 60;
+        let limiteGrafica = 60; // Por defecto Tiempo real
         const memoriaGrafica = { labels: [], voltaje: [], corriente: [], potencia: [], energia: [], frecuencia: [], factor_potencia: [] };
         const configGraficas = {
             voltaje: { nombre: 'Voltaje (V)', color: '#007bff' }, corriente: { nombre: 'Corriente (A)', color: '#dc3545' },
@@ -157,13 +218,13 @@
         }
 
         // ==========================================
-        // MÓDULO: FILTROS Y TABLA
+        // MÓDULO: FILTROS Y TABLA CON PAGINACIÓN DE SERVIDOR
         // ==========================================
         function aplicarFiltros() {
             fFecha = document.getElementById('filtro-fecha').value;
             fParam = document.getElementById('filtro-parametro').value;
             fOrdenDesc = document.getElementById('filtro-orden').value === 'desc';
-            paginaActual = 1; // Reiniciar a la primera página al filtrar
+            paginaActual = 1; 
             cargarPaginaTabla();
         }
 
@@ -194,27 +255,34 @@
             const inicio = (paginaActual - 1) * REGISTROS_POR_PAGINA;
             const fin = inicio + REGISTROS_POR_PAGINA - 1;
 
-            let query = supabaseClient.from('mediciones').select('*');
+            // Solicitar conteo exacto para calcular la paginación correctamente
+            let query = supabaseClient.from('mediciones').select('*', { count: 'exact' });
 
-            // Aplicar Filtro de Fecha Exacta (Asumiendo zona horaria de Colombia UTC-5)
             if (fFecha) {
                 query = query.gte('created_at', `${fFecha}T00:00:00-05:00`)
                              .lte('created_at', `${fFecha}T23:59:59-05:00`);
             }
 
-            // Aplicar Ordenamiento
-            query = query.order(fParam, { ascending: !fOrdenDesc });
-            query = query.range(inicio, fin);
+            query = query.order(fParam, { ascending: !fOrdenDesc }).range(inicio, fin);
 
-            const { data } = await query;
+            const { data, count } = await query;
             const tbody = document.getElementById('tabla-body');
             tbody.innerHTML = '';
             
             if (data) data.forEach(med => tbody.appendChild(crearFilaHTML(med)));
 
-            document.getElementById('page-info').innerText = `Página ${paginaActual}`;
+            // Actualizar la barra de consola oscura
+            if(count !== null) {
+                totalRegistros = count;
+                totalPaginas = Math.ceil(totalRegistros / REGISTROS_POR_PAGINA) || 1;
+            }
+
+            document.getElementById('input-page').value = paginaActual;
+            document.getElementById('total-pages-info').innerText = `de ${totalPaginas}`;
+            document.getElementById('total-records-info').innerText = `${totalRegistros} registros`;
+            
             document.getElementById('btn-prev').disabled = paginaActual === 1;
-            document.getElementById('btn-next').disabled = !data || data.length < REGISTROS_POR_PAGINA;
+            document.getElementById('btn-next').disabled = paginaActual >= totalPaginas;
         }
 
         function cambiarPagina(delta) {
@@ -222,16 +290,57 @@
             cargarPaginaTabla();
         }
 
+        function irAPagina(val) {
+            let p = parseInt(val);
+            if (p >= 1 && p <= totalPaginas) {
+                paginaActual = p;
+                cargarPaginaTabla();
+            } else {
+                document.getElementById('input-page').value = paginaActual; // Revertir si el valor es inválido
+            }
+        }
+
+        function cambiarFilas() {
+            REGISTROS_POR_PAGINA = parseInt(document.getElementById('select-rows').value);
+            paginaActual = 1;
+            cargarPaginaTabla();
+        }
+
         // ==========================================
-        // MÓDULO: GRÁFICAS
+        // MÓDULO: GRÁFICAS CON ZOOM Y PAN
         // ==========================================
         function inicializarGrafico() {
             const ctx = document.getElementById('canvas-principal').getContext('2d');
             const conf = configGraficas[parametroGrafico];
+            
+            if(graficoPrincipal) graficoPrincipal.destroy(); // Destruir gráfico anterior si existe
+
             graficoPrincipal = new Chart(ctx, {
                 type: 'line',
-                data: { labels: memoriaGrafica.labels, datasets: [{ label: conf.nombre, data: memoriaGrafica[parametroGrafico], borderColor: conf.color, backgroundColor: conf.color + '33', fill: true, tension: 0.4 }] },
-                options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 }, scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } } } }
+                data: { 
+                    labels: memoriaGrafica.labels, 
+                    datasets: [{ 
+                        label: conf.nombre, 
+                        data: memoriaGrafica[parametroGrafico], 
+                        borderColor: conf.color, 
+                        backgroundColor: conf.color + '33', 
+                        fill: true, 
+                        tension: 0.4,
+                        pointRadius: limiteGrafica > 100 ? 0 : 3 // Ocultar puntos si hay muchos datos para mejor rendimiento
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    animation: { duration: 400 }, 
+                    scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } } },
+                    plugins: {
+                        zoom: {
+                            pan: { enabled: true, mode: 'x' }, // Habilitar arrastre horizontal
+                            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } // Habilitar scroll del ratón
+                        }
+                    }
+                }
             });
         }
 
@@ -248,11 +357,36 @@
             graficoPrincipal.update();
         }
 
+        async function cambiarRangoTiempo(rango, event) {
+            document.querySelectorAll('.btn-time').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Determinar límite de consulta para evitar congelar el navegador
+            if(rango === 'realtime') limiteGrafica = 60;
+            if(rango === 'dia') limiteGrafica = 500;
+            if(rango === 'mes') limiteGrafica = 2000;
+            if(rango === 'ano') limiteGrafica = 5000;
+
+            await cargarMemoriaGrafica();
+        }
+
         async function cargarMemoriaGrafica() {
-            const { data } = await supabaseClient.from('mediciones').select('*').order('created_at', { ascending: false }).limit(MAX_CHART_POINTS);
+            const { data } = await supabaseClient
+                .from('mediciones')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(limiteGrafica);
+
+            // Limpiar memoria
+            for(let key in memoriaGrafica) memoriaGrafica[key] = [];
+
             if (data) {
                 [...data].reverse().forEach(med => {
-                    memoriaGrafica.labels.push(new Date(med.created_at).toLocaleTimeString());
+                    const objFecha = new Date(med.created_at);
+                    // Si es tiempo real mostrar solo la hora. Si es más viejo, mostrar fecha y hora
+                    const etiqueta = limiteGrafica <= 60 ? objFecha.toLocaleTimeString() : objFecha.toLocaleString();
+                    
+                    memoriaGrafica.labels.push(etiqueta);
                     memoriaGrafica.voltaje.push(med.voltaje); memoriaGrafica.corriente.push(med.corriente);
                     memoriaGrafica.potencia.push(med.potencia); memoriaGrafica.energia.push(med.energia);
                     memoriaGrafica.frecuencia.push(med.frecuencia); memoriaGrafica.factor_potencia.push(med.factor_potencia);
@@ -262,7 +396,7 @@
         }
 
         // ==========================================
-        // MÓDULO: TIEMPO REAL
+        // MÓDULO: TIEMPO REAL (WEBSOCKETS)
         // ==========================================
         function procesarNuevoDato(payload) {
             const datos = payload.new;
@@ -273,24 +407,31 @@
             document.getElementById('val-potencia').innerText = datos.potencia; document.getElementById('val-energia').innerText = datos.energia;
             document.getElementById('val-frecuencia').innerText = datos.frecuencia; document.getElementById('val-pf').innerText = datos.factor_potencia;
 
-            // 2. Tabla (Solo insertar dinámicamente si estamos en la vista predeterminada sin filtros)
+            // 2. Tabla (Insertar dinámicamente si estamos en la vista predeterminada sin filtros)
             if (paginaActual === 1 && fParam === 'created_at' && fOrdenDesc && !fFecha) {
                 const tbody = document.getElementById('tabla-body');
                 tbody.prepend(crearFilaHTML(datos));
                 if (tbody.children.length > REGISTROS_POR_PAGINA) tbody.removeChild(tbody.lastChild);
+                
+                // Actualizar contadores
+                totalRegistros++;
+                document.getElementById('total-records-info').innerText = `${totalRegistros} registros`;
             }
 
-            // 3. Gráficas
-            memoriaGrafica.labels.push(horaStr); memoriaGrafica.voltaje.push(datos.voltaje);
-            memoriaGrafica.corriente.push(datos.corriente); memoriaGrafica.potencia.push(datos.potencia);
-            memoriaGrafica.energia.push(datos.energia); memoriaGrafica.frecuencia.push(datos.frecuencia);
-            memoriaGrafica.factor_potencia.push(datos.factor_potencia);
+            // 3. Gráficas (Solo actualizar dinámicamente si estamos en modo "Tiempo Real")
+            if(limiteGrafica === 60) {
+                memoriaGrafica.labels.push(horaStr); memoriaGrafica.voltaje.push(datos.voltaje);
+                memoriaGrafica.corriente.push(datos.corriente); memoriaGrafica.potencia.push(datos.potencia);
+                memoriaGrafica.energia.push(datos.energia); memoriaGrafica.frecuencia.push(datos.frecuencia);
+                memoriaGrafica.factor_potencia.push(datos.factor_potencia);
 
-            if (memoriaGrafica.labels.length > MAX_CHART_POINTS) {
-                memoriaGrafica.labels.shift(); memoriaGrafica.voltaje.shift(); memoriaGrafica.corriente.shift();
-                memoriaGrafica.potencia.shift(); memoriaGrafica.energia.shift(); memoriaGrafica.frecuencia.shift(); memoriaGrafica.factor_potencia.shift();
+                if (memoriaGrafica.labels.length > limiteGrafica) {
+                    memoriaGrafica.labels.shift(); memoriaGrafica.voltaje.shift(); memoriaGrafica.corriente.shift();
+                    memoriaGrafica.potencia.shift(); memoriaGrafica.energia.shift(); memoriaGrafica.frecuencia.shift(); memoriaGrafica.factor_potencia.shift();
+                }
+                graficoPrincipal.update();
             }
-            graficoPrincipal.update();
+            
             statusDiv.innerText = "Última actualización: " + horaStr;
         }
 
@@ -298,6 +439,7 @@
             if(status === 'SUBSCRIBED') statusDiv.innerText = "Conectado y recibiendo datos con hora de red...";
         });
 
+        // Arranque Inicial
         cargarPaginaTabla();
         cargarMemoriaGrafica();
     </script>
