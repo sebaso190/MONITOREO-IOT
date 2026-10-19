@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Eléctrico IoT</title>
+    <!-- Cargar SDK de Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f4f4f9; padding: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+        .valor { font-size: 2em; font-weight: bold; color: #007bff; margin: 10px 0; }
+        .unidad { font-size: 0.9em; color: #666; }
+        .status { text-align: center; margin-bottom: 20px; color: #28a745; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center;">Monitor de Energía en Tiempo Real</h1>
+    <div id="conexion-status" class="status">Conectando a la base de datos...</div>
+
+    <div class="grid">
+        <div class="card"><h3>Voltaje</h3><div class="valor" id="val-voltaje">0</div><div class="unidad">Voltios (V)</div></div>
+        <div class="card"><h3>Corriente</h3><div class="valor" id="val-corriente">0</div><div class="unidad">Amperios (A)</div></div>
+        <div class="card"><h3>Potencia</h3><div class="valor" id="val-potencia">0</div><div class="unidad">Vatios (W)</div></div>
+        <div class="card"><h3>Energía</h3><div class="valor" id="val-energia">0</div><div class="unidad">kWh</div></div>
+        <div class="card"><h3>Frecuencia</h3><div class="valor" id="val-frecuencia">0</div><div class="unidad">Hz</div></div>
+        <div class="card"><h3>Factor de Potencia</h3><div class="valor" id="val-pf">0</div><div class="unidad">PF</div></div>
+    </div>
+
+    <script>
+        // Inicializar cliente Supabase
+        const SUPABASE_URL = 'https://jhhwfpdirkqknuepqpzv.supabase.co/rest/v1/';
+        const SUPABASE_KEY = 'sb_publishable_bWL26c7cp7NEhc_6odLRKg_4inoIAuM';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const statusDiv = document.getElementById('conexion-status');
+
+        // Función para actualizar la interfaz
+        function actualizarUI(payload) {
+            const datos = payload.new;
+            document.getElementById('val-voltaje').innerText = datos.voltaje;
+            document.getElementById('val-corriente').innerText = datos.corriente;
+            document.getElementById('val-potencia').innerText = datos.potencia;
+            document.getElementById('val-energia').innerText = datos.energia;
+            document.getElementById('val-frecuencia').innerText = datos.frecuencia;
+            document.getElementById('val-pf').innerText = datos.factor_potencia;
+            
+            statusDiv.innerText = "Última actualización: " + new Date().toLocaleTimeString();
+        }
+
+        // Suscribirse a los cambios en tiempo real de la tabla 'mediciones'
+        const subscription = supabase
+            .channel('mediciones-channel')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, payload => {
+                actualizarUI(payload);
+            })
+            .subscribe((status) => {
+                if(status === 'SUBSCRIBED') {
+                    statusDiv.innerText = "Conectado. Esperando datos del ESP8266...";
+                }
+            });
+    </script>
+</body>
+</html>
