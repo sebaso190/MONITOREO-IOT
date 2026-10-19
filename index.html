@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitor Eléctrico IoT</title>
-    <!-- Supabase SDK y Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -16,12 +15,17 @@
         .view.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         
-        /* Tarjetas Tiempo Real */
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; max-width: 1000px; margin: 0 auto; }
         .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
         .valor { font-size: 2em; font-weight: bold; color: #007bff; margin: 10px 0; }
         .unidad { font-size: 0.9em; color: #666; }
         .status { text-align: center; margin-bottom: 20px; color: #28a745; font-weight: bold; }
+        
+        /* Controles de Filtro */
+        .filter-bar { max-width: 1000px; margin: 0 auto 15px auto; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .filter-bar select, .filter-bar input { padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.9em; flex-grow: 1; }
+        .btn-filter { padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-clear { padding: 8px 15px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         
         /* Tabla Histórico y Paginación */
         .table-container { max-width: 1000px; margin: 0 auto; overflow-x: auto; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -32,9 +36,9 @@
         .btn-page { padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-page:disabled { background: #ccc; cursor: not-allowed; }
         
-        /* Selector y Contenedor de la Gráfica Gigante */
+        /* Gráficas */
         .chart-controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
-        .btn-chart { padding: 8px 15px; background: #e9ecef; border: 1px solid #ccc; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-chart { padding: 8px 15px; background: #e9ecef; border: 1px solid #ccc; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .btn-chart.active { background: #343a40; color: white; border-color: #343a40; }
         .chart-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 1000px; margin: 0 auto; }
         .chart-wrapper { position: relative; width: 100%; height: 60vh; min-height: 400px; }
@@ -46,7 +50,7 @@
     
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('realtime', event)">Tiempo Real</button>
-        <button class="tab-btn" onclick="switchTab('history', event)">Historial de Lecturas</button>
+        <button class="tab-btn" onclick="switchTab('history', event)">Historial y Filtros</button>
         <button class="tab-btn" onclick="switchTab('charts', event)">Gráfica Dinámica</button>
     </div>
 
@@ -64,13 +68,32 @@
         </div>
     </div>
 
-    <!-- Vista 2: Historial (Paginado a 20) -->
+    <!-- Vista 2: Historial con Filtros -->
     <div id="history" class="view">
+        <div class="filter-bar">
+            <label>Fecha:</label>
+            <input type="date" id="filtro-fecha">
+            <label>Ordenar por:</label>
+            <select id="filtro-parametro">
+                <option value="created_at">Hora de Registro</option>
+                <option value="voltaje">Voltaje</option>
+                <option value="corriente">Corriente</option>
+                <option value="potencia">Potencia</option>
+                <option value="energia">Energía</option>
+            </select>
+            <select id="filtro-orden">
+                <option value="desc">De Mayor a Menor (Desc)</option>
+                <option value="asc">De Menor a Mayor (Asc)</option>
+            </select>
+            <button class="btn-filter" onclick="aplicarFiltros()">Aplicar Filtros</button>
+            <button class="btn-clear" onclick="limpiarFiltros()">Limpiar</button>
+        </div>
+
         <div class="table-container">
             <table id="tabla-historico">
                 <thead>
                     <tr>
-                        <th>Fecha</th><th>Hora</th><th>Voltaje (V)</th><th>Corriente (A)</th>
+                        <th>Fecha</th><th>Hora (NTP)</th><th>Voltaje (V)</th><th>Corriente (A)</th>
                         <th>Potencia (W)</th><th>Energía (kWh)</th><th>Frec. (Hz)</th><th>FP</th>
                     </tr>
                 </thead>
@@ -86,7 +109,7 @@
 
     <!-- Vista 3: Gráfica Dinámica Gigante -->
     <div id="charts" class="view">
-        <div class="chart-controls" id="chart-buttons">
+        <div class="chart-controls">
             <button class="btn-chart active" onclick="cambiarParametroGrafico('voltaje', event)">Voltaje</button>
             <button class="btn-chart" onclick="cambiarParametroGrafico('corriente', event)">Corriente</button>
             <button class="btn-chart" onclick="cambiarParametroGrafico('potencia', event)">Potencia</button>
@@ -102,37 +125,30 @@
     </div>
 
     <script>
-        // --- Credenciales Supabase ---
         const SUPABASE_URL = 'https://jhhwfpdirkqknuepqpzv.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_bWL26c7cp7NEhc_6odLRKg_4inoIAuM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const statusDiv = document.getElementById('conexion-status');
 
-        // --- Variables Globales ---
-        // Para la Tabla
+        // Variables de Estado
         let paginaActual = 1;
         const REGISTROS_POR_PAGINA = 20;
-
-        // Para la Gráfica
-        let graficoPrincipal;
-        let parametroActual = 'voltaje'; // Por defecto
-        const MAX_CHART_POINTS = 60; // 5 minutos de datos a 5s
         
-        const memoriaGrafica = {
-            labels: [], voltaje: [], corriente: [], potencia: [],
-            energia: [], frecuencia: [], factor_potencia: []
-        };
+        // Estado de los Filtros
+        let fFecha = '';
+        let fParam = 'created_at';
+        let fOrdenDesc = true;
 
+        let graficoPrincipal;
+        let parametroGrafico = 'voltaje';
+        const MAX_CHART_POINTS = 60;
+        const memoriaGrafica = { labels: [], voltaje: [], corriente: [], potencia: [], energia: [], frecuencia: [], factor_potencia: [] };
         const configGraficas = {
-            voltaje: { nombre: 'Voltaje (V)', color: '#007bff' },
-            corriente: { nombre: 'Corriente (A)', color: '#dc3545' },
-            potencia: { nombre: 'Potencia (W)', color: '#ffc107' },
-            energia: { nombre: 'Energía (kWh)', color: '#28a745' },
-            frecuencia: { nombre: 'Frecuencia (Hz)', color: '#17a2b8' },
-            factor_potencia: { nombre: 'Factor de Potencia', color: '#6f42c1' }
+            voltaje: { nombre: 'Voltaje (V)', color: '#007bff' }, corriente: { nombre: 'Corriente (A)', color: '#dc3545' },
+            potencia: { nombre: 'Potencia (W)', color: '#ffc107' }, energia: { nombre: 'Energía (kWh)', color: '#28a745' },
+            frecuencia: { nombre: 'Frecuencia (Hz)', color: '#17a2b8' }, factor_potencia: { nombre: 'Factor de Potencia', color: '#6f42c1' }
         };
 
-        // --- Control de Pestañas ---
         function switchTab(tabId, event) {
             document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -141,8 +157,23 @@
         }
 
         // ==========================================
-        // MÓDULO: TABLA HISTÓRICA CON PAGINACIÓN
+        // MÓDULO: FILTROS Y TABLA
         // ==========================================
+        function aplicarFiltros() {
+            fFecha = document.getElementById('filtro-fecha').value;
+            fParam = document.getElementById('filtro-parametro').value;
+            fOrdenDesc = document.getElementById('filtro-orden').value === 'desc';
+            paginaActual = 1; // Reiniciar a la primera página al filtrar
+            cargarPaginaTabla();
+        }
+
+        function limpiarFiltros() {
+            document.getElementById('filtro-fecha').value = '';
+            document.getElementById('filtro-parametro').value = 'created_at';
+            document.getElementById('filtro-orden').value = 'desc';
+            aplicarFiltros();
+        }
+
         function crearFilaHTML(datos) {
             const fechaObj = new Date(datos.created_at);
             const tr = document.createElement('tr');
@@ -163,24 +194,27 @@
             const inicio = (paginaActual - 1) * REGISTROS_POR_PAGINA;
             const fin = inicio + REGISTROS_POR_PAGINA - 1;
 
-            const { data, error } = await supabaseClient
-                .from('mediciones')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .range(inicio, fin);
-            
-            const tbody = document.getElementById('tabla-body');
-            tbody.innerHTML = ''; // Limpiar tabla
-            
-            if (data) {
-                data.forEach(med => tbody.appendChild(crearFilaHTML(med)));
+            let query = supabaseClient.from('mediciones').select('*');
+
+            // Aplicar Filtro de Fecha Exacta (Asumiendo zona horaria de Colombia UTC-5)
+            if (fFecha) {
+                query = query.gte('created_at', `${fFecha}T00:00:00-05:00`)
+                             .lte('created_at', `${fFecha}T23:59:59-05:00`);
             }
 
-            // Actualizar interfaz de paginación
+            // Aplicar Ordenamiento
+            query = query.order(fParam, { ascending: !fOrdenDesc });
+            query = query.range(inicio, fin);
+
+            const { data } = await query;
+            const tbody = document.getElementById('tabla-body');
+            tbody.innerHTML = '';
+            
+            if (data) data.forEach(med => tbody.appendChild(crearFilaHTML(med)));
+
             document.getElementById('page-info').innerText = `Página ${paginaActual}`;
             document.getElementById('btn-prev').disabled = paginaActual === 1;
-            // Si trajo menos de 20 registros, es la última página
-            document.getElementById('btn-next').disabled = data.length < REGISTROS_POR_PAGINA;
+            document.getElementById('btn-next').disabled = !data || data.length < REGISTROS_POR_PAGINA;
         }
 
         function cambiarPagina(delta) {
@@ -189,49 +223,24 @@
         }
 
         // ==========================================
-        // MÓDULO: GRÁFICA GIGANTE DINÁMICA
+        // MÓDULO: GRÁFICAS
         // ==========================================
         function inicializarGrafico() {
             const ctx = document.getElementById('canvas-principal').getContext('2d');
-            const conf = configGraficas[parametroActual];
-
+            const conf = configGraficas[parametroGrafico];
             graficoPrincipal = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: memoriaGrafica.labels,
-                    datasets: [{
-                        label: conf.nombre,
-                        data: memoriaGrafica[parametroActual],
-                        borderColor: conf.color,
-                        backgroundColor: conf.color + '33',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 3,
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: { duration: 400 },
-                    plugins: { legend: { display: true, position: 'top', labels: { font: { size: 14, weight: 'bold' } } } },
-                    scales: { 
-                        x: { ticks: { maxRotation: 45, minRotation: 45 } },
-                        y: { beginAtZero: false } // Escala dinámica
-                    }
-                }
+                data: { labels: memoriaGrafica.labels, datasets: [{ label: conf.nombre, data: memoriaGrafica[parametroGrafico], borderColor: conf.color, backgroundColor: conf.color + '33', fill: true, tension: 0.4 }] },
+                options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 }, scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } } } }
             });
         }
 
         function cambiarParametroGrafico(param, event) {
-            parametroActual = param;
+            parametroGrafico = param;
             const conf = configGraficas[param];
-            
-            // Actualizar estilo del menú
             document.querySelectorAll('.btn-chart').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
 
-            // Actualizar datos del Chart.js sin recrearlo
             graficoPrincipal.data.datasets[0].label = conf.nombre;
             graficoPrincipal.data.datasets[0].data = memoriaGrafica[param];
             graficoPrincipal.data.datasets[0].borderColor = conf.color;
@@ -240,83 +249,55 @@
         }
 
         async function cargarMemoriaGrafica() {
-            const { data } = await supabaseClient
-                .from('mediciones')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(MAX_CHART_POINTS);
-
+            const { data } = await supabaseClient.from('mediciones').select('*').order('created_at', { ascending: false }).limit(MAX_CHART_POINTS);
             if (data) {
                 [...data].reverse().forEach(med => {
                     memoriaGrafica.labels.push(new Date(med.created_at).toLocaleTimeString());
-                    memoriaGrafica.voltaje.push(med.voltaje);
-                    memoriaGrafica.corriente.push(med.corriente);
-                    memoriaGrafica.potencia.push(med.potencia);
-                    memoriaGrafica.energia.push(med.energia);
-                    memoriaGrafica.frecuencia.push(med.frecuencia);
-                    memoriaGrafica.factor_potencia.push(med.factor_potencia);
+                    memoriaGrafica.voltaje.push(med.voltaje); memoriaGrafica.corriente.push(med.corriente);
+                    memoriaGrafica.potencia.push(med.potencia); memoriaGrafica.energia.push(med.energia);
+                    memoriaGrafica.frecuencia.push(med.frecuencia); memoriaGrafica.factor_potencia.push(med.factor_potencia);
                 });
             }
             inicializarGrafico();
         }
 
         // ==========================================
-        // MÓDULO: TIEMPO REAL (WEBSOCKET)
+        // MÓDULO: TIEMPO REAL
         // ==========================================
         function procesarNuevoDato(payload) {
             const datos = payload.new;
             const horaStr = new Date(datos.created_at).toLocaleTimeString();
             
-            // 1. Actualizar Tarjetas (Vista 1)
-            document.getElementById('val-voltaje').innerText = datos.voltaje;
-            document.getElementById('val-corriente').innerText = datos.corriente;
-            document.getElementById('val-potencia').innerText = datos.potencia;
-            document.getElementById('val-energia').innerText = datos.energia;
-            document.getElementById('val-frecuencia').innerText = datos.frecuencia;
-            document.getElementById('val-pf').innerText = datos.factor_potencia;
+            // 1. Tarjetas
+            document.getElementById('val-voltaje').innerText = datos.voltaje; document.getElementById('val-corriente').innerText = datos.corriente;
+            document.getElementById('val-potencia').innerText = datos.potencia; document.getElementById('val-energia').innerText = datos.energia;
+            document.getElementById('val-frecuencia').innerText = datos.frecuencia; document.getElementById('val-pf').innerText = datos.factor_potencia;
 
-            // 2. Actualizar Tabla (Solo si el usuario está en la Página 1)
-            if (paginaActual === 1) {
+            // 2. Tabla (Solo insertar dinámicamente si estamos en la vista predeterminada sin filtros)
+            if (paginaActual === 1 && fParam === 'created_at' && fOrdenDesc && !fFecha) {
                 const tbody = document.getElementById('tabla-body');
-                tbody.prepend(crearFilaHTML(datos)); // Insertar arriba
-                if (tbody.children.length > REGISTROS_POR_PAGINA) {
-                    tbody.removeChild(tbody.lastChild); // Mantener límite de 20
-                }
+                tbody.prepend(crearFilaHTML(datos));
+                if (tbody.children.length > REGISTROS_POR_PAGINA) tbody.removeChild(tbody.lastChild);
             }
 
-            // 3. Actualizar Memoria de la Gráfica y dibujarla
-            memoriaGrafica.labels.push(horaStr);
-            memoriaGrafica.voltaje.push(datos.voltaje);
-            memoriaGrafica.corriente.push(datos.corriente);
-            memoriaGrafica.potencia.push(datos.potencia);
-            memoriaGrafica.energia.push(datos.energia);
-            memoriaGrafica.frecuencia.push(datos.frecuencia);
+            // 3. Gráficas
+            memoriaGrafica.labels.push(horaStr); memoriaGrafica.voltaje.push(datos.voltaje);
+            memoriaGrafica.corriente.push(datos.corriente); memoriaGrafica.potencia.push(datos.potencia);
+            memoriaGrafica.energia.push(datos.energia); memoriaGrafica.frecuencia.push(datos.frecuencia);
             memoriaGrafica.factor_potencia.push(datos.factor_potencia);
 
-            // Eliminar el dato más viejo si se pasa del límite (Desplazamiento)
             if (memoriaGrafica.labels.length > MAX_CHART_POINTS) {
-                memoriaGrafica.labels.shift();
-                memoriaGrafica.voltaje.shift();
-                memoriaGrafica.corriente.shift();
-                memoriaGrafica.potencia.shift();
-                memoriaGrafica.energia.shift();
-                memoriaGrafica.frecuencia.shift();
-                memoriaGrafica.factor_potencia.shift();
+                memoriaGrafica.labels.shift(); memoriaGrafica.voltaje.shift(); memoriaGrafica.corriente.shift();
+                memoriaGrafica.potencia.shift(); memoriaGrafica.energia.shift(); memoriaGrafica.frecuencia.shift(); memoriaGrafica.factor_potencia.shift();
             }
-            
             graficoPrincipal.update();
             statusDiv.innerText = "Última actualización: " + horaStr;
         }
 
-        // Suscribirse a la base de datos
-        supabaseClient
-            .channel('mediciones-channel')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, procesarNuevoDato)
-            .subscribe((status) => {
-                if(status === 'SUBSCRIBED') statusDiv.innerText = "Conectado. Recibiendo datos...";
-            });
+        supabaseClient.channel('mediciones-channel').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, procesarNuevoDato).subscribe((status) => {
+            if(status === 'SUBSCRIBED') statusDiv.innerText = "Conectado y recibiendo datos con hora de red...";
+        });
 
-        // Arranque inicial
         cargarPaginaTabla();
         cargarMemoriaGrafica();
     </script>
