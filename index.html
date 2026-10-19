@@ -4,34 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitor Eléctrico IoT</title>
-    <!-- Supabase SDK -->
+    <!-- Supabase SDK y Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Chart.js para las gráficas -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: system-ui, sans-serif; background: #f4f4f9; padding: 20px; margin: 0; }
+        body { font-family: system-ui, sans-serif; background: #f4f4f9; padding: 15px; margin: 0; }
         .tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
         .tab-btn { padding: 10px 20px; cursor: pointer; background: #ddd; border: none; border-radius: 5px; font-weight: bold; transition: 0.3s; }
-        .tab-btn:hover { background: #ccc; }
         .tab-btn.active { background: #007bff; color: white; }
-        .view { display: none; }
+        .view { display: none; animation: fadeIn 0.3s; }
         .view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         
-        /* Tarjetas */
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; max-width: 1000px; margin: 0 auto; }
+        /* Tarjetas Tiempo Real */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; max-width: 1000px; margin: 0 auto; }
         .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
         .valor { font-size: 2em; font-weight: bold; color: #007bff; margin: 10px 0; }
         .unidad { font-size: 0.9em; color: #666; }
         .status { text-align: center; margin-bottom: 20px; color: #28a745; font-weight: bold; }
         
-        /* Tabla */
+        /* Tabla Histórico y Paginación */
         .table-container { max-width: 1000px; margin: 0 auto; overflow-x: auto; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9em; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9em; min-width: 600px; }
         th, td { padding: 12px; border-bottom: 1px solid #ddd; }
         th { background-color: #f8f9fa; color: #333; }
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 15px; }
+        .btn-page { padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-page:disabled { background: #ccc; cursor: not-allowed; }
         
-        /* Contenedor de gráficas para mantener proporción */
-        .chart-container { position: relative; width: 100%; height: 250px; }
+        /* Selector y Contenedor de la Gráfica Gigante */
+        .chart-controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        .btn-chart { padding: 8px 15px; background: #e9ecef; border: 1px solid #ccc; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-chart.active { background: #343a40; color: white; border-color: #343a40; }
+        .chart-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 1000px; margin: 0 auto; }
+        .chart-wrapper { position: relative; width: 100%; height: 60vh; min-height: 400px; }
     </style>
 </head>
 <body>
@@ -41,12 +47,12 @@
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('realtime', event)">Tiempo Real</button>
         <button class="tab-btn" onclick="switchTab('history', event)">Historial de Lecturas</button>
-        <button class="tab-btn" onclick="switchTab('charts', event)">Gráficas</button>
+        <button class="tab-btn" onclick="switchTab('charts', event)">Gráfica Dinámica</button>
     </div>
 
     <div id="conexion-status" class="status">Conectando a la base de datos...</div>
 
-    <!-- 1. Vista Tiempo Real -->
+    <!-- Vista 1: Tiempo Real -->
     <div id="realtime" class="view active">
         <div class="grid">
             <div class="card"><h3>Voltaje</h3><div class="valor" id="val-voltaje">0</div><div class="unidad">V</div></div>
@@ -58,7 +64,7 @@
         </div>
     </div>
 
-    <!-- 2. Vista Historial -->
+    <!-- Vista 2: Historial (Paginado a 20) -->
     <div id="history" class="view">
         <div class="table-container">
             <table id="tabla-historico">
@@ -71,30 +77,60 @@
                 <tbody id="tabla-body"></tbody>
             </table>
         </div>
+        <div class="pagination">
+            <button class="btn-page" id="btn-prev" onclick="cambiarPagina(-1)">Anterior</button>
+            <span id="page-info" style="font-weight: bold;">Página 1</span>
+            <button class="btn-page" id="btn-next" onclick="cambiarPagina(1)">Siguiente</button>
+        </div>
     </div>
 
-    <!-- 3. Vista Gráficas -->
+    <!-- Vista 3: Gráfica Dinámica Gigante -->
     <div id="charts" class="view">
-        <div class="grid">
-            <div class="card"><h3>Voltaje (V)</h3><div class="chart-container"><canvas id="grafico-voltaje"></canvas></div></div>
-            <div class="card"><h3>Corriente (A)</h3><div class="chart-container"><canvas id="grafico-corriente"></canvas></div></div>
-            <div class="card"><h3>Potencia (W)</h3><div class="chart-container"><canvas id="grafico-potencia"></canvas></div></div>
-            <div class="card"><h3>Energía (kWh)</h3><div class="chart-container"><canvas id="grafico-energia"></canvas></div></div>
-            <div class="card"><h3>Frecuencia (Hz)</h3><div class="chart-container"><canvas id="grafico-frecuencia"></canvas></div></div>
-            <div class="card"><h3>Factor Potencia</h3><div class="chart-container"><canvas id="grafico-pf"></canvas></div></div>
+        <div class="chart-controls" id="chart-buttons">
+            <button class="btn-chart active" onclick="cambiarParametroGrafico('voltaje', event)">Voltaje</button>
+            <button class="btn-chart" onclick="cambiarParametroGrafico('corriente', event)">Corriente</button>
+            <button class="btn-chart" onclick="cambiarParametroGrafico('potencia', event)">Potencia</button>
+            <button class="btn-chart" onclick="cambiarParametroGrafico('energia', event)">Energía</button>
+            <button class="btn-chart" onclick="cambiarParametroGrafico('frecuencia', event)">Frecuencia</button>
+            <button class="btn-chart" onclick="cambiarParametroGrafico('factor_potencia', event)">Factor de Potencia</button>
+        </div>
+        <div class="chart-card">
+            <div class="chart-wrapper">
+                <canvas id="canvas-principal"></canvas>
+            </div>
         </div>
     </div>
 
     <script>
-        // --- Credenciales ---
+        // --- Credenciales Supabase ---
         const SUPABASE_URL = 'https://jhhwfpdirkqknuepqpzv.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_bWL26c7cp7NEhc_6odLRKg_4inoIAuM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const statusDiv = document.getElementById('conexion-status');
 
         // --- Variables Globales ---
-        const MAX_DATAPOINTS = 30; // Mostrar solo las últimas 30 lecturas en la gráfica
-        const charts = {}; // Objeto para guardar las instancias de Chart.js
+        // Para la Tabla
+        let paginaActual = 1;
+        const REGISTROS_POR_PAGINA = 20;
+
+        // Para la Gráfica
+        let graficoPrincipal;
+        let parametroActual = 'voltaje'; // Por defecto
+        const MAX_CHART_POINTS = 60; // 5 minutos de datos a 5s
+        
+        const memoriaGrafica = {
+            labels: [], voltaje: [], corriente: [], potencia: [],
+            energia: [], frecuencia: [], factor_potencia: []
+        };
+
+        const configGraficas = {
+            voltaje: { nombre: 'Voltaje (V)', color: '#007bff' },
+            corriente: { nombre: 'Corriente (A)', color: '#dc3545' },
+            potencia: { nombre: 'Potencia (W)', color: '#ffc107' },
+            energia: { nombre: 'Energía (kWh)', color: '#28a745' },
+            frecuencia: { nombre: 'Frecuencia (Hz)', color: '#17a2b8' },
+            factor_potencia: { nombre: 'Factor de Potencia', color: '#6f42c1' }
+        };
 
         // --- Control de Pestañas ---
         function switchTab(tabId, event) {
@@ -104,54 +140,13 @@
             if(event) event.target.classList.add('active');
         }
 
-        // --- Inicialización de Gráficos (Chart.js) ---
-        function inicializarGraficos() {
-            const configBase = {
-                type: 'line',
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    animation: { duration: 400 },
-                    scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } } },
-                    plugins: { legend: { display: false } }
-                }
-            };
-
-            const crearConfig = (color) => JSON.parse(JSON.stringify({...configBase, data: { labels: [], datasets: [{ data: [], borderColor: color, backgroundColor: color + '33', fill: true, tension: 0.4 }] }}));
-
-            charts.voltaje = new Chart(document.getElementById('grafico-voltaje'), crearConfig('#007bff'));
-            charts.corriente = new Chart(document.getElementById('grafico-corriente'), crearConfig('#dc3545'));
-            charts.potencia = new Chart(document.getElementById('grafico-potencia'), crearConfig('#ffc107'));
-            charts.energia = new Chart(document.getElementById('grafico-energia'), crearConfig('#28a745'));
-            charts.frecuencia = new Chart(document.getElementById('grafico-frecuencia'), crearConfig('#17a2b8'));
-            charts.pf = new Chart(document.getElementById('grafico-pf'), crearConfig('#6f42c1'));
-        }
-
-        // --- Agregar Datos a los Gráficos ---
-        function actualizarGrafico(hora, datos) {
-            // Actualizar los valores en cada gráfico
-            const mapeo = { voltaje: 'voltaje', corriente: 'corriente', potencia: 'potencia', energia: 'energia', frecuencia: 'frecuencia', pf: 'factor_potencia' };
-            
-            for (let key in charts) {
-                const chart = charts[key];
-                chart.data.labels.push(hora);
-                chart.data.datasets[0].data.push(datos[mapeo[key]]);
-                
-                // Si excede el máximo, eliminar el más viejo (desplazamiento a la izquierda)
-                if (chart.data.labels.length > MAX_DATAPOINTS) {
-                    chart.data.labels.shift();
-                    chart.data.datasets[0].data.shift();
-                }
-                chart.update();
-            }
-        }
-
-        // --- Renderizar una fila en la tabla ---
-        function crearFila(datos, prepend = false) {
-            const tbody = document.getElementById('tabla-body');
+        // ==========================================
+        // MÓDULO: TABLA HISTÓRICA CON PAGINACIÓN
+        // ==========================================
+        function crearFilaHTML(datos) {
             const fechaObj = new Date(datos.created_at);
-            const fila = document.createElement('tr');
-            fila.innerHTML = `
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
                 <td>${fechaObj.toLocaleDateString()}</td>
                 <td>${fechaObj.toLocaleTimeString()}</td>
                 <td>${datos.voltaje}</td>
@@ -161,68 +156,169 @@
                 <td>${datos.frecuencia}</td>
                 <td>${datos.factor_potencia}</td>
             `;
-            prepend ? tbody.prepend(fila) : tbody.appendChild(fila);
+            return tr;
         }
 
-        // --- Cargar Historial Inicial ---
-        async function cargarHistorial() {
-            inicializarGraficos(); // Crear los canvas vacíos primero
-            
+        async function cargarPaginaTabla() {
+            const inicio = (paginaActual - 1) * REGISTROS_POR_PAGINA;
+            const fin = inicio + REGISTROS_POR_PAGINA - 1;
+
             const { data, error } = await supabaseClient
                 .from('mediciones')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(MAX_DATAPOINTS); // Traer la misma cantidad que soporta la gráfica
+                .range(inicio, fin);
             
-            if (data && data.length > 0) {
-                // Para la tabla: los más nuevos van arriba
-                data.forEach(medicion => crearFila(medicion));
-                
-                // Para las gráficas: necesitamos orden cronológico (de izquierda a derecha), así que invertimos el arreglo temporalmente
-                const datosCronologicos = [...data].reverse();
-                datosCronologicos.forEach(medicion => {
-                    const hora = new Date(medicion.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
-                    actualizarGrafico(hora, medicion);
-                });
+            const tbody = document.getElementById('tabla-body');
+            tbody.innerHTML = ''; // Limpiar tabla
+            
+            if (data) {
+                data.forEach(med => tbody.appendChild(crearFilaHTML(med)));
             }
+
+            // Actualizar interfaz de paginación
+            document.getElementById('page-info').innerText = `Página ${paginaActual}`;
+            document.getElementById('btn-prev').disabled = paginaActual === 1;
+            // Si trajo menos de 20 registros, es la última página
+            document.getElementById('btn-next').disabled = data.length < REGISTROS_POR_PAGINA;
         }
 
-        // --- Recepción de Datos en Tiempo Real ---
-        function actualizarUI(payload) {
-            const datos = payload.new;
-            const horaStr = new Date(datos.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+        function cambiarPagina(delta) {
+            paginaActual += delta;
+            cargarPaginaTabla();
+        }
+
+        // ==========================================
+        // MÓDULO: GRÁFICA GIGANTE DINÁMICA
+        // ==========================================
+        function inicializarGrafico() {
+            const ctx = document.getElementById('canvas-principal').getContext('2d');
+            const conf = configGraficas[parametroActual];
+
+            graficoPrincipal = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: memoriaGrafica.labels,
+                    datasets: [{
+                        label: conf.nombre,
+                        data: memoriaGrafica[parametroActual],
+                        borderColor: conf.color,
+                        backgroundColor: conf.color + '33',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 400 },
+                    plugins: { legend: { display: true, position: 'top', labels: { font: { size: 14, weight: 'bold' } } } },
+                    scales: { 
+                        x: { ticks: { maxRotation: 45, minRotation: 45 } },
+                        y: { beginAtZero: false } // Escala dinámica
+                    }
+                }
+            });
+        }
+
+        function cambiarParametroGrafico(param, event) {
+            parametroActual = param;
+            const conf = configGraficas[param];
             
-            // 1. Actualizar Tarjetas Grandes
+            // Actualizar estilo del menú
+            document.querySelectorAll('.btn-chart').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Actualizar datos del Chart.js sin recrearlo
+            graficoPrincipal.data.datasets[0].label = conf.nombre;
+            graficoPrincipal.data.datasets[0].data = memoriaGrafica[param];
+            graficoPrincipal.data.datasets[0].borderColor = conf.color;
+            graficoPrincipal.data.datasets[0].backgroundColor = conf.color + '33';
+            graficoPrincipal.update();
+        }
+
+        async function cargarMemoriaGrafica() {
+            const { data } = await supabaseClient
+                .from('mediciones')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(MAX_CHART_POINTS);
+
+            if (data) {
+                [...data].reverse().forEach(med => {
+                    memoriaGrafica.labels.push(new Date(med.created_at).toLocaleTimeString());
+                    memoriaGrafica.voltaje.push(med.voltaje);
+                    memoriaGrafica.corriente.push(med.corriente);
+                    memoriaGrafica.potencia.push(med.potencia);
+                    memoriaGrafica.energia.push(med.energia);
+                    memoriaGrafica.frecuencia.push(med.frecuencia);
+                    memoriaGrafica.factor_potencia.push(med.factor_potencia);
+                });
+            }
+            inicializarGrafico();
+        }
+
+        // ==========================================
+        // MÓDULO: TIEMPO REAL (WEBSOCKET)
+        // ==========================================
+        function procesarNuevoDato(payload) {
+            const datos = payload.new;
+            const horaStr = new Date(datos.created_at).toLocaleTimeString();
+            
+            // 1. Actualizar Tarjetas (Vista 1)
             document.getElementById('val-voltaje').innerText = datos.voltaje;
             document.getElementById('val-corriente').innerText = datos.corriente;
             document.getElementById('val-potencia').innerText = datos.potencia;
             document.getElementById('val-energia').innerText = datos.energia;
             document.getElementById('val-frecuencia').innerText = datos.frecuencia;
             document.getElementById('val-pf').innerText = datos.factor_potencia;
+
+            // 2. Actualizar Tabla (Solo si el usuario está en la Página 1)
+            if (paginaActual === 1) {
+                const tbody = document.getElementById('tabla-body');
+                tbody.prepend(crearFilaHTML(datos)); // Insertar arriba
+                if (tbody.children.length > REGISTROS_POR_PAGINA) {
+                    tbody.removeChild(tbody.lastChild); // Mantener límite de 20
+                }
+            }
+
+            // 3. Actualizar Memoria de la Gráfica y dibujarla
+            memoriaGrafica.labels.push(horaStr);
+            memoriaGrafica.voltaje.push(datos.voltaje);
+            memoriaGrafica.corriente.push(datos.corriente);
+            memoriaGrafica.potencia.push(datos.potencia);
+            memoriaGrafica.energia.push(datos.energia);
+            memoriaGrafica.frecuencia.push(datos.frecuencia);
+            memoriaGrafica.factor_potencia.push(datos.factor_potencia);
+
+            // Eliminar el dato más viejo si se pasa del límite (Desplazamiento)
+            if (memoriaGrafica.labels.length > MAX_CHART_POINTS) {
+                memoriaGrafica.labels.shift();
+                memoriaGrafica.voltaje.shift();
+                memoriaGrafica.corriente.shift();
+                memoriaGrafica.potencia.shift();
+                memoriaGrafica.energia.shift();
+                memoriaGrafica.frecuencia.shift();
+                memoriaGrafica.factor_potencia.shift();
+            }
             
-            // 2. Agregar a la Tabla (arriba)
-            crearFila(datos, true);
-            
-            // 3. Agregar a las Gráficas
-            actualizarGrafico(horaStr, datos);
-            
+            graficoPrincipal.update();
             statusDiv.innerText = "Última actualización: " + horaStr;
         }
 
-        // Suscripción al WebSocket de Supabase
-        const subscription = supabaseClient
+        // Suscribirse a la base de datos
+        supabaseClient
             .channel('mediciones-channel')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, payload => {
-                actualizarUI(payload);
-            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, procesarNuevoDato)
             .subscribe((status) => {
-                if(status === 'SUBSCRIBED') {
-                    statusDiv.innerText = "Conectado. Recibiendo datos...";
-                }
+                if(status === 'SUBSCRIBED') statusDiv.innerText = "Conectado. Recibiendo datos...";
             });
 
-        // Arrancar todo al cargar
-        cargarHistorial();
+        // Arranque inicial
+        cargarPaginaTabla();
+        cargarMemoriaGrafica();
     </script>
 </body>
 </html>
