@@ -7,10 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>MAGOM - Monitoreo IoT</title>
   
-  <!-- Tailwind CSS para el diseño -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Supabase y Chart.js con Plugins de Zoom/Desplazamiento -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
@@ -22,7 +19,6 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     
-    /* Animación de Carga */
     .loader-dots div { animation-timing-function: cubic-bezier(0, 1, 1, 0); }
     .loader-dots div:nth-child(1) { left: 8px; animation: loader-dots1 0.6s infinite; }
     .loader-dots div:nth-child(2) { left: 8px; animation: loader-dots2 0.6s infinite; }
@@ -32,7 +28,6 @@
     @keyframes loader-dots3 { 0% { transform: scale(1); } 100% { transform: scale(0); } }
     @keyframes loader-dots2 { 0% { transform: translate(0, 0); } 100% { transform: translate(24px, 0); } }
 
-    /* Estilos Custom de la Tabla y Paginación (Modo Oscuro) */
     .table-container { width: 100%; overflow-x: auto; background: #1e293b; border-radius: 0.5rem; border: 1px solid #334155; }
     table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.85rem; min-width: 700px; color: #cbd5e1; }
     th, td { padding: 12px; border-bottom: 1px solid #334155; }
@@ -43,396 +38,266 @@
         display: flex; align-items: center; justify-content: flex-start; gap: 12px;
         padding: 12px 15px; border-radius: 0.5rem; font-size: 13px; flex-wrap: wrap;
     }
-    .btn-icon {
-        background: transparent; color: #e0e0e0; border: 1px solid #475569; border-radius: 6px;
-        width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-        transition: 0.2s; font-size: 16px;
-    }
+    .btn-icon { background: transparent; color: #e0e0e0; border: 1px solid #475569; border-radius: 6px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; font-size: 16px; }
     .btn-icon:hover:not(:disabled) { background: #334155; border-color: #64748b; }
     .btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
-    .page-input {
-        background: #020617; color: #fff; border: 1px solid #475569; border-radius: 6px;
-        width: 45px; text-align: center; padding: 6px; font-weight: bold; outline: none;
-    }
+    .page-input { background: #020617; color: #fff; border: 1px solid #475569; border-radius: 6px; width: 45px; text-align: center; padding: 6px; font-weight: bold; outline: none; }
     .page-input:focus { border-color: #ef4444; }
-    .rows-select {
-        background: #020617; color: #fff; border: 1px solid #475569; border-radius: 6px;
-        padding: 6px 10px; cursor: pointer; font-weight: bold; outline: none;
-    }
+    .rows-select { background: #020617; color: #fff; border: 1px solid #475569; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-weight: bold; outline: none; }
   </style>
 </head>
 <body class="pb-24 overflow-x-hidden">
 
-  <!-- ================= SPLASH/LOADING SCREEN CON DETECTOR DE ERRORES ================= -->
+  <!-- ================= SPLASH ================= -->
   <div id="splash-screen" class="fixed inset-0 z-[500] bg-slate-900 flex flex-col justify-center items-center p-6 transition-opacity duration-300">
     <h1 class="text-4xl font-black text-center text-red-600 mb-2 tracking-widest animate-pulse">MAGOM</h1>
-    <p class="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-4" id="splash-msg">Verificando sesión...</p>
+    <p class="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-4">Verificando...</p>
     <div class="mt-4 loader-dots relative w-16 h-5">
       <div class="absolute top-1 w-2.5 h-2.5 rounded-full bg-red-600"></div><div class="absolute top-1 w-2.5 h-2.5 rounded-full bg-red-600"></div>
       <div class="absolute top-1 w-2.5 h-2.5 rounded-full bg-red-600"></div><div class="absolute top-1 w-2.5 h-2.5 rounded-full bg-red-600"></div>
     </div>
   </div>
 
-  <!-- ================= PANTALLA DE AUTENTICACIÓN ================= -->
+  <!-- ================= AUTENTICACIÓN ================= -->
   <div id="auth-screen" class="fixed inset-0 z-[100] bg-slate-900 flex flex-col justify-center items-center p-6 hidden">
     <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-sm">
       <h1 class="text-4xl font-black text-center text-red-600 mb-2 tracking-widest">MAGOM</h1>
       <p class="text-center text-slate-400 text-sm mb-6 uppercase tracking-widest">Monitoreo IoT</p>
-      
       <input type="email" id="auth-email" placeholder="Correo electrónico" class="w-full bg-slate-700 p-3 rounded-lg mb-3 text-white outline-none focus:border-red-500 border border-transparent transition">
       <input type="password" id="auth-pass" placeholder="Contraseña" class="w-full bg-slate-700 p-3 rounded-lg mb-6 text-white outline-none focus:border-red-500 border border-transparent transition">
-      
       <button id="btn-login" onclick="login()" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded-lg mb-3 transition shadow-lg">Iniciar Sesión</button>
       <button id="btn-register" onclick="register()" class="w-full bg-slate-700 hover:bg-slate-600 text-red-400 font-bold py-3 rounded-lg transition border border-slate-600">Crear Cuenta</button>
+    </div>
+  </div>
+
+  <!-- ================= MODAL DE EQUIPOS (VINCULACIÓN) ================= -->
+  <div id="modal-equipos" class="fixed inset-0 z-[200] bg-slate-900/95 hidden flex flex-col justify-center items-center p-4">
+    <div class="bg-slate-800 p-6 rounded-2xl border border-red-500 shadow-2xl w-full max-w-sm relative">
+      <button onclick="cerrarModalEquipos()" id="btn-close-equipos" class="absolute top-3 right-4 text-2xl font-black text-slate-400 hover:text-white">&times;</button>
+      <h2 class="text-xl font-black text-red-500 mb-2">Vincular Equipo</h2>
+      <p class="text-[11px] text-slate-400 mb-4">Ingresa el ID único de tu medidor MAGOM y asígnale un nombre.</p>
       
-      <div class="flex justify-between items-center mt-4 border-t border-slate-700 pt-4">
-        <button onclick="solicitarRecuperacionOTP()" class="text-xs text-slate-400 hover:text-white underline transition">¿Olvidó su clave?</button>
-        <button onclick="contactarSoporte()" class="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition">💬 Soporte WhatsApp</button>
+      <input type="text" id="eq-id" placeholder="ID del Equipo (Ej: MAGOM_A1B2)" class="w-full bg-slate-700 p-3 rounded-lg mb-3 text-white uppercase outline-none focus:border-red-500">
+      <input type="text" id="eq-nombre" placeholder="Nombre (Ej: Principal, Local 1)" class="w-full bg-slate-700 p-3 rounded-lg mb-4 text-white outline-none focus:border-red-500">
+      <button onclick="vincularEquipo()" id="btn-vincular" class="w-full bg-red-700 hover:bg-red-600 py-3 rounded-lg font-bold text-white shadow-lg transition-colors">Vincular Medidor</button>
+      
+      <div class="mt-4 pt-4 border-t border-slate-700" id="seccion-mis-equipos">
+          <h3 class="text-xs font-bold text-slate-400 mb-2">Mis Equipos Actuales:</h3>
+          <div id="lista-mis-equipos" class="space-y-2 max-h-32 overflow-y-auto no-scrollbar"></div>
       </div>
     </div>
   </div>
 
-  <!-- ================= MODAL RECUPERACIÓN OTP ================= -->
-  <div id="modal-recuperacion-otp" class="fixed inset-0 z-[300] bg-slate-900/95 hidden flex flex-col justify-center items-center p-4">
-    <div class="bg-slate-800 p-6 rounded-2xl border border-red-500 shadow-2xl w-full max-w-sm text-center relative">
-      <button onclick="cerrarRecuperacionOTP()" class="absolute top-3 right-4 text-2xl font-black text-slate-400 hover:text-white">&times;</button>
-      <h2 class="text-xl font-black text-red-500 mb-2">Recuperar Contraseña</h2>
-      <p class="text-[11px] text-slate-400 mb-4">Hemos enviado un código de 8 dígitos a tu correo. Ingrésalo aquí junto con tu nueva contraseña.</p>
-      <input type="text" id="otp-codigo" placeholder="Código numérico" maxlength="8" inputmode="numeric" pattern="[0-9]*" class="w-full bg-slate-700 p-3 rounded-lg mb-3 text-center text-xl font-bold tracking-[0.25em] text-red-400 outline-none focus:border-red-500 border border-transparent">
-      <input type="password" id="otp-nueva-pass" placeholder="Nueva contraseña (mínimo 6 caracteres)" class="w-full bg-slate-700 p-3 rounded-lg mb-6 text-white outline-none focus:border-red-500 border border-transparent text-sm">
-      <button id="btn-confirmar-otp" onclick="verificarYCambiarPassword()" class="w-full bg-red-700 hover:bg-red-600 py-3 rounded-lg font-bold text-white shadow-lg transition-colors">Verificar y Cambiar</button>
-    </div>
-  </div>
-
-  <!-- ================= HEADER PRINCIPAL ================= -->
+  <!-- ================= HEADER PRINCIPAL MULTIDISPOSITIVO ================= -->
   <header class="p-4 bg-slate-800 border-b border-slate-700 sticky top-0 z-10 flex justify-between items-center shadow-md hidden" id="main-header">
-    <div>
+    <div class="flex flex-col">
         <h1 class="font-black text-lg text-red-500 tracking-wider">MAGOM</h1>
-        <p class="text-[10px] text-slate-400">Medidor Eléctrico Inteligente</p>
+        <select id="device-selector" onchange="cambiarDispositivoActivo()" class="bg-transparent text-slate-300 text-[11px] font-bold outline-none cursor-pointer mt-1 border border-slate-600 rounded px-1 max-w-[130px]"></select>
     </div>
     <div class="flex items-center gap-2">
-       <button onclick="logout()" class="text-xs bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 px-3 py-1.5 rounded-lg font-bold shadow">Cerrar Sesión</button>
+       <button onclick="abrirModalEquipos()" class="text-xs bg-red-700 hover:bg-red-600 text-white px-2.5 py-1.5 rounded-lg font-bold shadow">+</button>
+       <button onclick="logout()" class="text-xs bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 px-3 py-1.5 rounded-lg font-bold shadow">Salir</button>
     </div>
   </header>
 
-  <!-- ================= CONTENEDOR PRINCIPAL DE LA APP ================= -->
+  <!-- ================= CONTENEDOR PRINCIPAL ================= -->
   <main class="p-4 max-w-4xl mx-auto relative hidden" id="main-app">
     
-    <!-- VISTA 1: TIEMPO REAL -->
     <section id="view-realtime" class="vista-seccion space-y-4">
-      <div id="conexion-status" class="bg-slate-800 border border-slate-700 p-3 rounded-lg text-center text-xs font-bold text-emerald-400 shadow-sm">
-          Conectando al medidor...
-      </div>
+      <div id="conexion-status" class="bg-slate-800 border border-slate-700 p-3 rounded-lg text-center text-xs font-bold text-emerald-400 shadow-sm">Conectando al medidor...</div>
       
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
-            <h3 class="text-xs font-bold text-slate-400 uppercase">Voltaje</h3>
-            <div class="text-3xl font-black text-blue-400 my-1" id="val-voltaje">0</div>
-            <div class="text-[10px] text-slate-500">Voltios (V)</div>
-        </div>
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
-            <h3 class="text-xs font-bold text-slate-400 uppercase">Corriente</h3>
-            <div class="text-3xl font-black text-yellow-400 my-1" id="val-corriente">0</div>
-            <div class="text-[10px] text-slate-500">Amperios (A)</div>
-        </div>
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
-            <h3 class="text-xs font-bold text-slate-400 uppercase">Potencia</h3>
-            <div class="text-3xl font-black text-orange-400 my-1" id="val-potencia">0</div>
-            <div class="text-[10px] text-slate-500">Vatios (W)</div>
-        </div>
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
-            <h3 class="text-xs font-bold text-slate-400 uppercase">Energía</h3>
-            <div class="text-3xl font-black text-emerald-400 my-1" id="val-energia">0</div>
-            <div class="text-[10px] text-slate-500">kWh</div>
-        </div>
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
-            <h3 class="text-xs font-bold text-slate-400 uppercase">Frecuencia</h3>
-            <div class="text-3xl font-black text-purple-400 my-1" id="val-frecuencia">0</div>
-            <div class="text-[10px] text-slate-500">Hertz (Hz)</div>
-        </div>
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
-            <h3 class="text-xs font-bold text-slate-400 uppercase">Factor Potencia</h3>
-            <div class="text-3xl font-black text-teal-400 my-1" id="val-pf">0</div>
-            <div class="text-[10px] text-slate-500">PF</div>
-        </div>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center"><h3 class="text-xs font-bold text-slate-400 uppercase">Voltaje</h3><div class="text-3xl font-black text-blue-400 my-1" id="val-voltaje">0</div><div class="text-[10px] text-slate-500">Voltios (V)</div></div>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center"><h3 class="text-xs font-bold text-slate-400 uppercase">Corriente</h3><div class="text-3xl font-black text-yellow-400 my-1" id="val-corriente">0</div><div class="text-[10px] text-slate-500">Amperios (A)</div></div>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center"><h3 class="text-xs font-bold text-slate-400 uppercase">Potencia</h3><div class="text-3xl font-black text-orange-400 my-1" id="val-potencia">0</div><div class="text-[10px] text-slate-500">Vatios (W)</div></div>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center"><h3 class="text-xs font-bold text-slate-400 uppercase">Energía</h3><div class="text-3xl font-black text-emerald-400 my-1" id="val-energia">0</div><div class="text-[10px] text-slate-500">kWh</div></div>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center"><h3 class="text-xs font-bold text-slate-400 uppercase">Frecuencia</h3><div class="text-3xl font-black text-purple-400 my-1" id="val-frecuencia">0</div><div class="text-[10px] text-slate-500">Hertz (Hz)</div></div>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center"><h3 class="text-xs font-bold text-slate-400 uppercase">Factor Pot.</h3><div class="text-3xl font-black text-teal-400 my-1" id="val-pf">0</div><div class="text-[10px] text-slate-500">PF</div></div>
       </div>
     </section>
 
-    <!-- VISTA 2: HISTORIAL Y TABLAS -->
     <section id="view-history" class="vista-seccion space-y-4 hidden">
         <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
             <div class="flex flex-wrap gap-2 items-end mb-4">
-                <div class="flex-1 min-w-[120px]">
-                    <label class="text-[10px] text-slate-400 uppercase font-bold">Fecha Exacta</label>
-                    <input type="date" id="filtro-fecha" class="w-full bg-slate-900 p-2 rounded border border-slate-600 text-sm outline-none focus:border-red-500 text-white">
-                </div>
-                <div class="flex-1 min-w-[120px]">
-                    <label class="text-[10px] text-slate-400 uppercase font-bold">Ordenar Por</label>
-                    <select id="filtro-parametro" class="w-full bg-slate-900 p-2 rounded border border-slate-600 text-sm outline-none focus:border-red-500 text-white">
-                        <option value="created_at">Hora de Registro</option>
-                        <option value="voltaje">Voltaje</option>
-                        <option value="corriente">Corriente</option>
-                        <option value="potencia">Potencia</option>
-                        <option value="energia">Energía</option>
-                    </select>
-                </div>
-                <div class="flex-1 min-w-[140px]">
-                    <label class="text-[10px] text-slate-400 uppercase font-bold">Dirección</label>
-                    <select id="filtro-orden" class="w-full bg-slate-900 p-2 rounded border border-slate-600 text-sm outline-none focus:border-red-500 text-white">
-                        <option value="desc">Mayor a Menor</option>
-                        <option value="asc">Menor a Mayor</option>
-                    </select>
-                </div>
-                <div class="flex gap-2 w-full sm:w-auto">
-                    <button onclick="aplicarFiltros()" class="flex-1 sm:flex-none bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded font-bold text-sm shadow">Filtrar</button>
-                    <button onclick="limpiarFiltros()" class="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded font-bold text-sm shadow">Limpiar</button>
-                </div>
+                <div class="flex-1 min-w-[120px]"><label class="text-[10px] text-slate-400 uppercase font-bold">Fecha</label><input type="date" id="filtro-fecha" class="w-full bg-slate-900 p-2 rounded border border-slate-600 text-sm text-white"></div>
+                <div class="flex-1 min-w-[120px]"><label class="text-[10px] text-slate-400 uppercase font-bold">Ordenar</label><select id="filtro-parametro" class="w-full bg-slate-900 p-2 rounded border border-slate-600 text-sm text-white"><option value="created_at">Hora</option><option value="voltaje">Voltaje</option><option value="corriente">Corriente</option><option value="potencia">Potencia</option><option value="energia">Energía</option></select></div>
+                <div class="flex-1 min-w-[140px]"><label class="text-[10px] text-slate-400 uppercase font-bold">Dirección</label><select id="filtro-orden" class="w-full bg-slate-900 p-2 rounded border border-slate-600 text-sm text-white"><option value="desc">Mayor a Menor</option><option value="asc">Menor a Mayor</option></select></div>
+                <div class="flex gap-2 w-full sm:w-auto"><button onclick="aplicarFiltros()" class="flex-1 sm:flex-none bg-red-700 text-white px-4 py-2 rounded font-bold text-sm">Filtrar</button><button onclick="limpiarFiltros()" class="flex-1 sm:flex-none bg-slate-700 text-white px-4 py-2 rounded font-bold text-sm">Limpiar</button></div>
             </div>
-
             <div class="table-container">
                 <table id="tabla-historico">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th><th>Hora (NTP)</th><th>Voltaje (V)</th><th>Corriente (A)</th>
-                            <th>Potencia (W)</th><th>Energía (kWh)</th><th>Frec. (Hz)</th><th>FP</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Fecha</th><th>Hora</th><th>V (V)</th><th>I (A)</th><th>P (W)</th><th>E (kWh)</th><th>F (Hz)</th><th>FP</th></tr></thead>
                     <tbody id="tabla-body"></tbody>
                 </table>
             </div>
-            
-            <!-- Paginación Estilo Consola Oscura -->
             <div class="pagination-dark">
                 <button class="btn-icon" id="btn-prev" onclick="cambiarPagina(-1)">←</button>
-                <span>Página</span>
-                <input type="number" id="input-page" class="page-input" value="1" min="1" onchange="irAPagina(this.value)">
-                <span id="total-pages-info" class="text-slate-400">de 1</span>
+                <span>Página</span><input type="number" id="input-page" class="page-input" value="1" min="1" onchange="irAPagina(this.value)"><span id="total-pages-info" class="text-slate-400">de 1</span>
                 <button class="btn-icon" id="btn-next" onclick="cambiarPagina(1)">→</button>
-                
-                <select id="select-rows" class="rows-select ml-auto" onchange="cambiarFilas()">
-                    <option value="20">20 filas</option>
-                    <option value="50">50 filas</option>
-                    <option value="100">100 filas</option>
-                    <option value="500">500 filas</option>
-                </select>
+                <select id="select-rows" class="rows-select ml-auto" onchange="cambiarFilas()"><option value="20">20 filas</option><option value="50">50 filas</option><option value="100">100 filas</option></select>
                 <span class="text-slate-400 ml-2" id="total-records-info">0 registros</span>
             </div>
         </div>
     </section>
 
-    <!-- VISTA 3: GRÁFICAS -->
     <section id="view-charts" class="vista-seccion space-y-4 hidden">
         <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
-            
             <div class="flex flex-wrap justify-center gap-2 mb-4" id="chart-buttons">
                 <button class="btn-chart active text-sm bg-red-700 text-white px-4 py-1.5 rounded-full font-bold shadow" onclick="cambiarParametroGrafico('voltaje', event)">Voltaje</button>
                 <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('corriente', event)">Corriente</button>
                 <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('potencia', event)">Potencia</button>
                 <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('energia', event)">Energía</button>
-                <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('frecuencia', event)">Frecuencia</button>
-                <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('factor_potencia', event)">F.P.</button>
             </div>
-            
             <div class="flex flex-wrap justify-center gap-2 mb-4 border-b border-slate-700 pb-4">
                 <button class="btn-time active text-xs border border-red-500 text-red-500 bg-red-950/30 px-3 py-1 rounded" onclick="cambiarRangoTiempo('realtime', event)">Tiempo Real</button>
                 <button class="btn-time text-xs border border-slate-600 text-slate-400 bg-slate-900 px-3 py-1 rounded" onclick="cambiarRangoTiempo('dia', event)">Último Día</button>
                 <button class="btn-time text-xs border border-slate-600 text-slate-400 bg-slate-900 px-3 py-1 rounded" onclick="cambiarRangoTiempo('mes', event)">Último Mes</button>
-                <button class="btn-time text-xs border border-slate-600 text-slate-400 bg-slate-900 px-3 py-1 rounded" onclick="cambiarRangoTiempo('ano', event)">Último Año</button>
             </div>
-
             <div class="relative w-full h-[50vh] min-h-[350px]">
                 <canvas id="canvas-principal"></canvas>
             </div>
-            <p class="text-center text-slate-400 text-[10px] mt-4">💡 <b>Tip:</b> Arrastra horizontalmente la gráfica o usa la rueda del ratón para hacer zoom.</p>
         </div>
     </section>
 
   </main>
 
-  <!-- ================= NAVEGACIÓN INFERIOR (BOTTOM NAV) ================= -->
+  <!-- ================= NAV INFERIOR ================= -->
   <nav class="fixed bottom-0 w-full bg-slate-800 border-t border-slate-700 flex justify-around p-2 pb-6 text-[10px] shadow-2xl z-10 hidden" id="main-nav">
-    <button onclick="cambiarVista('realtime')" id="nav-realtime" class="nav-btn text-red-500 flex flex-col items-center gap-1 font-bold transition-colors">
-        <span class="text-xl">⚡</span><span>Monitoreo</span>
-    </button>
-    <button onclick="cambiarVista('history')" id="nav-history" class="nav-btn text-slate-400 flex flex-col items-center gap-1 font-bold transition-colors">
-        <span class="text-xl">📋</span><span>Historial</span>
-    </button>
-    <button onclick="cambiarVista('charts')" id="nav-charts" class="nav-btn text-slate-400 flex flex-col items-center gap-1 font-bold transition-colors">
-        <span class="text-xl">📈</span><span>Gráficas</span>
-    </button>
+    <button onclick="cambiarVista('realtime')" id="nav-realtime" class="nav-btn text-red-500 flex flex-col items-center gap-1 font-bold transition-colors"><span class="text-xl">⚡</span><span>Monitoreo</span></button>
+    <button onclick="cambiarVista('history')" id="nav-history" class="nav-btn text-slate-400 flex flex-col items-center gap-1 font-bold transition-colors"><span class="text-xl">📋</span><span>Historial</span></button>
+    <button onclick="cambiarVista('charts')" id="nav-charts" class="nav-btn text-slate-400 flex flex-col items-center gap-1 font-bold transition-colors"><span class="text-xl">📈</span><span>Gráficas</span></button>
   </nav>
 
   <script>
-    // ==========================================
-    // SISTEMA DE DETECCIÓN DE ERRORES
-    // ==========================================
-    window.onerror = function(msg, url, line) {
-      const splash = document.getElementById('splash-screen');
-      if (splash) {
-        splash.classList.remove('hidden');
-        splash.innerHTML = `<div class="bg-slate-800 p-6 rounded-2xl border-2 border-red-500 shadow-2xl w-full max-w-sm text-center m-4"><h3 class="text-red-500 font-bold mb-2 uppercase tracking-wide">Error Detectado</h3><p class="text-xs text-slate-300 break-words mb-4 text-left">${msg}<br><br>Línea: ${line}</p><button onclick="location.reload()" class="w-full bg-red-700 text-white font-bold py-3 rounded-lg">Reintentar</button></div>`;
-      }
-    };
-    window.addEventListener('unhandledrejection', function(e) {
-      const splash = document.getElementById('splash-screen');
-      if (splash) {
-        splash.classList.remove('hidden');
-        splash.innerHTML = `<div class="bg-slate-800 p-6 rounded-2xl border-2 border-red-500 shadow-2xl w-full max-w-sm text-center m-4"><h3 class="text-red-500 font-bold mb-2 uppercase tracking-wide">Error de Conexión</h3><p class="text-xs text-slate-300 break-words mb-4 text-left">${e.reason}</p><button onclick="location.reload()" class="w-full bg-red-700 text-white font-bold py-3 rounded-lg">Reintentar</button></div>`;
-      }
-    });
-
-    // ==========================================
-    // VARIABLES GLOBALES Y SUPABASE (PROYECTO MEDIDOR)
-    // ==========================================
+    // --- VARIABLES Y SUPABASE ---
     const SUPABASE_URL = 'https://jhhwfpdirkqknuepqpzv.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_bWL26c7cp7NEhc_6odLRKg_4inoIAuM';
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Variables Paginación Tabla
-    let paginaActual = 1;
-    let REGISTROS_POR_PAGINA = 20;
-    let totalRegistros = 0;
-    let totalPaginas = 1;
+    let authUser = null;
+    let activeDeviceId = null; // Guardará el ID del ESP8266 seleccionado
     
-    // Variables Filtros Tabla
-    let fFecha = '';
-    let fParam = 'created_at';
-    let fOrdenDesc = true;
+    let paginaActual = 1; let REGISTROS_POR_PAGINA = 20; let totalRegistros = 0; let totalPaginas = 1;
+    let fFecha = ''; let fParam = 'created_at'; let fOrdenDesc = true;
 
-    // Variables Gráficas
-    let graficoPrincipal;
-    let parametroGrafico = 'voltaje';
-    let limiteGrafica = 60; // 60 datos para Tiempo Real por defecto
+    let graficoPrincipal; let parametroGrafico = 'voltaje'; let limiteGrafica = 60;
     const memoriaGrafica = { labels: [], voltaje: [], corriente: [], potencia: [], energia: [], frecuencia: [], factor_potencia: [] };
-    
-    // Colores adaptados a la lectura, pero manteniendo legibilidad en fondo oscuro
     const configGraficas = {
-        voltaje: { nombre: 'Voltaje (V)', color: '#3b82f6' }, 
-        corriente: { nombre: 'Corriente (A)', color: '#facc15' },
-        potencia: { nombre: 'Potencia (W)', color: '#fb923c' }, 
-        energia: { nombre: 'Energía (kWh)', color: '#34d399' },
-        frecuencia: { nombre: 'Frecuencia (Hz)', color: '#c084fc' }, 
-        factor_potencia: { nombre: 'Factor de Potencia', color: '#2dd4bf' }
+        voltaje: { nombre: 'Voltaje (V)', color: '#3b82f6' }, corriente: { nombre: 'Corriente (A)', color: '#facc15' },
+        potencia: { nombre: 'Potencia (W)', color: '#fb923c' }, energia: { nombre: 'Energía (kWh)', color: '#34d399' }
     };
 
     // ==========================================
-    // AUTENTICACIÓN SIMPLIFICADA (CORREO/PASS)
+    // AUTENTICACIÓN Y GESTIÓN DE EQUIPOS
     // ==========================================
     document.addEventListener('DOMContentLoaded', async () => {
-      try {
-        await checkSession();
-      } catch (err) {
-        document.getElementById('splash-screen').classList.add('hidden');
-        document.getElementById('auth-screen').classList.remove('hidden');
-      }
+        const { data: { session } } = await db.auth.getSession();
+        if (session) await gestionarSesion(session.user);
+        else document.getElementById('splash-screen').classList.add('hidden'), document.getElementById('auth-screen').classList.remove('hidden');
     });
 
-    async function checkSession() {
-      const { data: { session } } = await db.auth.getSession();
-      if (session) {
-        document.getElementById('auth-screen').classList.add('hidden');
-        document.getElementById('splash-screen').classList.add('hidden');
-        
-        document.getElementById('main-header').classList.remove('hidden');
-        document.getElementById('main-app').classList.remove('hidden');
-        document.getElementById('main-nav').classList.remove('hidden');
-        
-        iniciarApp();
-      } else {
-        document.getElementById('splash-screen').classList.add('hidden');
-        document.getElementById('auth-screen').classList.remove('hidden');
-      }
-    }
-
     async function login() { 
-        const e = document.getElementById('auth-email').value.trim(); 
-        const p = document.getElementById('auth-pass').value; 
-        if(!e || !p) return alert('Ingresa correo y contraseña'); 
-        
-        document.getElementById('btn-login').innerText = "Cargando..."; 
-        const { error } = await db.auth.signInWithPassword({ email: e, password: p }); 
-        
-        if(error) { 
-            alert('Error: ' + error.message); 
-            document.getElementById('btn-login').innerText = "Iniciar Sesión"; 
-        } else { 
-            document.getElementById('splash-screen').classList.remove('hidden'); 
-            await checkSession(); 
-        } 
+        const e=document.getElementById('auth-email').value.trim(), p=document.getElementById('auth-pass').value; 
+        if(!e||!p) return alert('Ingresa datos'); 
+        document.getElementById('btn-login').innerText="Cargando..."; 
+        const {data, error}=await db.auth.signInWithPassword({email:e,password:p}); 
+        if(error) { alert('Error: '+error.message); document.getElementById('btn-login').innerText="Iniciar Sesión"; }
+        else await gestionarSesion(data.user);
     }
 
     async function register() { 
-        const e = document.getElementById('auth-email').value.trim(); 
-        const p = document.getElementById('auth-pass').value; 
-        if(!e || !p) return alert('Ingresa datos.'); 
+        const e=document.getElementById('auth-email').value.trim(), p=document.getElementById('auth-pass').value; 
+        if(!e||!p) return alert('Ingresa datos'); document.getElementById('btn-register').innerText="Creando..."; 
+        const {error}=await db.auth.signUp({email:e,password:p}); 
+        if(error) alert('Error: '+error.message); else alert('Registro exitoso. Inicia sesión.'); 
+        document.getElementById('btn-register').innerText="Crear Cuenta"; 
+    }
+    async function logout() { await db.auth.signOut(); location.reload(); }
+
+    async function gestionarSesion(user) {
+        authUser = user;
+        document.getElementById('auth-screen').classList.add('hidden');
+        document.getElementById('splash-screen').classList.remove('hidden');
+
+        // Buscar si el usuario ya tiene equipos vinculados
+        const { data: equipos } = await db.from('dispositivos').select('*').eq('user_id', authUser.id);
         
-        document.getElementById('btn-register').innerText = "Creando..."; 
-        const { error } = await db.auth.signUp({ email: e, password: p }); 
+        document.getElementById('splash-screen').classList.add('hidden');
         
-        if(error) { 
-            alert('Error: ' + error.message); 
-        } else { 
-            alert('Registro exitoso. Inicia sesión.'); 
-        } 
-        document.getElementById('btn-register').innerText = "Crear Cuenta"; 
+        if (!equipos || equipos.length === 0) {
+            // Obligar a vincular equipo
+            document.getElementById('btn-close-equipos').classList.add('hidden');
+            document.getElementById('seccion-mis-equipos').classList.add('hidden');
+            document.getElementById('modal-equipos').classList.remove('hidden');
+        } else {
+            // Llenar el selector y arrancar
+            renderizarSelectorEquipos(equipos);
+            activeDeviceId = equipos[0].id;
+            
+            document.getElementById('modal-equipos').classList.add('hidden');
+            document.getElementById('main-header').classList.remove('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            document.getElementById('main-nav').classList.remove('hidden');
+            iniciarApp();
+        }
     }
 
-    async function logout() { 
-        await db.auth.signOut(); 
-        location.reload(); 
+    function renderizarSelectorEquipos(equipos) {
+        const select = document.getElementById('device-selector');
+        select.innerHTML = equipos.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+        
+        // Renderizar lista en el modal
+        document.getElementById('lista-mis-equipos').innerHTML = equipos.map(e => `
+            <div class="flex justify-between items-center bg-slate-700/50 p-2 rounded border border-slate-600">
+                <div><p class="text-sm font-bold text-white">${e.nombre}</p><p class="text-[10px] text-slate-400 font-mono">${e.id}</p></div>
+                <button onclick="eliminarEquipo('${e.id}')" class="text-rose-500 bg-rose-900/30 px-2 py-1 rounded text-xs font-bold">X</button>
+            </div>
+        `).join('');
     }
 
-    function contactarSoporte() { 
-        const email = document.getElementById('auth-email').value.trim(); 
-        let mensaje = "Hola, necesito ayuda con el Monitor MAGOM."; 
-        if (email) mensaje += ` Mi correo es: ${email}`; 
-        window.open(`https://wa.me/573012878516?text=${encodeURIComponent(mensaje)}`, '_blank'); 
+    async function vincularEquipo() {
+        const eqId = document.getElementById('eq-id').value.trim().toUpperCase();
+        const eqNom = document.getElementById('eq-nombre').value.trim();
+        if(!eqId || !eqNom) return alert('El ID y el Nombre son obligatorios.');
+        
+        document.getElementById('btn-vincular').innerText = "Vinculando...";
+        const { error } = await db.from('dispositivos').insert([{ id: eqId, user_id: authUser.id, nombre: eqNom }]);
+        
+        if(error) {
+            alert('Error: Asegúrate de que el ID sea correcto o que no esté registrado por alguien más.');
+        } else {
+            document.getElementById('btn-vincular').innerText = "¡Vinculado!";
+            setTimeout(() => { location.reload(); }, 1000); // Recargar para limpiar todo e iniciar con el equipo
+        }
     }
 
-    // Funciones de Recuperación (Ocultar/Mostrar/Verificar)
-    async function solicitarRecuperacionOTP() { 
-        const email = document.getElementById('auth-email').value.trim(); 
-        if (!email) return alert('Escribe tu correo electrónico en la casilla primero.'); 
-        const confirmar = confirm(`¿Enviar código de recuperación a ${email}?`); 
-        if (!confirmar) return; 
-        
-        const { error } = await db.auth.resetPasswordForEmail(email); 
-        if (error) return alert('Error: ' + error.message); 
-        
-        alert('¡Código enviado!'); 
-        document.getElementById('auth-screen').classList.add('hidden'); 
-        document.getElementById('modal-recuperacion-otp').classList.remove('hidden'); 
-    }
-    
-    async function verificarYCambiarPassword() { 
-        const email = document.getElementById('auth-email').value.trim(); 
-        const token = document.getElementById('otp-codigo').value.trim(); 
-        const newPass = document.getElementById('otp-nueva-pass').value; 
-        if (token.length !== 8) return alert('El código debe tener 8 dígitos.'); 
-        if (!newPass || newPass.length < 6) return alert('Mínimo 6 caracteres.'); 
-        
-        const btn = document.getElementById('btn-confirmar-otp');
-        btn.innerText = "Verificando..."; 
-        
-        const { error: errorOtp } = await db.auth.verifyOtp({ email: email, token: token, type: 'recovery' }); 
-        if (errorOtp) { btn.innerText = "Verificar y Cambiar"; return alert('Error de código: ' + errorOtp.message); } 
-        
-        const { error: errorUpdate } = await db.auth.updateUser({ password: newPass }); 
-        if (errorUpdate) { btn.innerText = "Verificar y Cambiar"; return alert('Error de guardado: ' + errorUpdate.message); } 
-        
-        alert('¡Contraseña actualizada!'); 
+    async function eliminarEquipo(id) {
+        if(!confirm('¿Seguro que deseas desvincular este equipo? No borrará sus datos, pero perderás acceso a ellos.')) return;
+        await db.from('dispositivos').delete().eq('id', id);
         location.reload();
     }
-    
-    function cerrarRecuperacionOTP() { 
-        document.getElementById('modal-recuperacion-otp').classList.add('hidden'); 
-        document.getElementById('auth-screen').classList.remove('hidden'); 
+
+    function abrirModalEquipos() {
+        document.getElementById('btn-close-equipos').classList.remove('hidden');
+        document.getElementById('seccion-mis-equipos').classList.remove('hidden');
+        document.getElementById('modal-equipos').classList.remove('hidden');
+    }
+    function cerrarModalEquipos() { document.getElementById('modal-equipos').classList.add('hidden'); }
+
+    function cambiarDispositivoActivo() {
+        activeDeviceId = document.getElementById('device-selector').value;
+        iniciarApp(); // Reiniciar vistas con el nuevo equipo
     }
 
     // ==========================================
-    // NAVEGACIÓN Y CARGA DE VISTAS
+    // VISTAS Y OBTENCIÓN DE DATOS POR DISPOSITIVO
     // ==========================================
     function iniciarApp() {
+        document.getElementById('val-voltaje').innerText = '0';
+        document.getElementById('val-corriente').innerText = '0';
+        document.getElementById('val-potencia').innerText = '0';
+        document.getElementById('val-energia').innerText = '0';
+        
         cambiarVista('realtime');
         cargarPaginaTabla();
         cargarMemoriaGrafica();
@@ -440,275 +305,74 @@
     }
 
     function cambiarVista(vista) {
-        // Ocultar todas las secciones
         document.querySelectorAll('.vista-seccion').forEach(el => el.classList.add('hidden'));
         document.getElementById(`view-${vista}`).classList.remove('hidden');
-        
-        // Resetear botones del Nav Inferior
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.classList.remove('text-red-500');
-            btn.classList.add('text-slate-400');
-        });
-        
-        // Activar el botón seleccionado
-        if(document.getElementById(`nav-${vista}`)) {
-            document.getElementById(`nav-${vista}`).classList.remove('text-slate-400');
-            document.getElementById(`nav-${vista}`).classList.add('text-red-500');
-        }
+        document.querySelectorAll('.nav-btn').forEach(btn => { btn.classList.remove('text-red-500'); btn.classList.add('text-slate-400'); });
+        if(document.getElementById(`nav-${vista}`)) { document.getElementById(`nav-${vista}`).classList.remove('text-slate-400'); document.getElementById(`nav-${vista}`).classList.add('text-red-500'); }
     }
 
-    // ==========================================
-    // MÓDULO: FILTROS Y TABLA
-    // ==========================================
-    function aplicarFiltros() {
-        fFecha = document.getElementById('filtro-fecha').value;
-        fParam = document.getElementById('filtro-parametro').value;
-        fOrdenDesc = document.getElementById('filtro-orden').value === 'desc';
-        paginaActual = 1; 
-        cargarPaginaTabla();
-    }
-
-    function limpiarFiltros() {
-        document.getElementById('filtro-fecha').value = '';
-        document.getElementById('filtro-parametro').value = 'created_at';
-        document.getElementById('filtro-orden').value = 'desc';
-        aplicarFiltros();
-    }
+    function aplicarFiltros() { fFecha = document.getElementById('filtro-fecha').value; fParam = document.getElementById('filtro-parametro').value; fOrdenDesc = document.getElementById('filtro-orden').value === 'desc'; paginaActual = 1; cargarPaginaTabla(); }
+    function limpiarFiltros() { document.getElementById('filtro-fecha').value = ''; document.getElementById('filtro-parametro').value = 'created_at'; document.getElementById('filtro-orden').value = 'desc'; aplicarFiltros(); }
 
     function crearFilaHTML(datos) {
-        const fechaObj = new Date(datos.created_at);
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-800/50 transition-colors";
-        tr.innerHTML = `
-            <td>${fechaObj.toLocaleDateString()}</td>
-            <td class="font-mono text-slate-400">${fechaObj.toLocaleTimeString()}</td>
-            <td class="font-bold">${datos.voltaje}</td>
-            <td class="font-bold">${datos.corriente}</td>
-            <td class="font-bold">${datos.potencia}</td>
-            <td class="font-bold text-emerald-400">${datos.energia}</td>
-            <td>${datos.frecuencia}</td>
-            <td>${datos.factor_potencia}</td>
-        `;
+        const d = new Date(datos.created_at); const tr = document.createElement('tr'); tr.className = "hover:bg-slate-800/50 transition-colors";
+        tr.innerHTML = `<td>${d.toLocaleDateString()}</td><td class="font-mono text-slate-400">${d.toLocaleTimeString()}</td><td class="font-bold">${datos.voltaje}</td><td class="font-bold">${datos.corriente}</td><td class="font-bold">${datos.potencia}</td><td class="font-bold text-emerald-400">${datos.energia}</td><td>${datos.frecuencia}</td><td>${datos.factor_potencia}</td>`;
         return tr;
     }
 
     async function cargarPaginaTabla() {
         const inicio = (paginaActual - 1) * REGISTROS_POR_PAGINA;
-        const fin = inicio + REGISTROS_POR_PAGINA - 1;
-
-        let query = db.from('mediciones').select('*', { count: 'exact' });
-
-        if (fFecha) {
-            query = query.gte('created_at', `${fFecha}T00:00:00-05:00`)
-                         .lte('created_at', `${fFecha}T23:59:59-05:00`);
-        }
-
-        query = query.order(fParam, { ascending: !fOrdenDesc }).range(inicio, fin);
+        // Solo consultar datos que coincidan con el equipo activo
+        let query = db.from('mediciones').select('*', { count: 'exact' }).eq('dispositivo_id', activeDeviceId);
+        
+        if (fFecha) query = query.gte('created_at', `${fFecha}T00:00:00-05:00`).lte('created_at', `${fFecha}T23:59:59-05:00`);
+        query = query.order(fParam, { ascending: !fOrdenDesc }).range(inicio, inicio + REGISTROS_POR_PAGINA - 1);
 
         const { data, count } = await query;
-        const tbody = document.getElementById('tabla-body');
-        tbody.innerHTML = '';
-        
-        if (data && data.length > 0) {
-            data.forEach(med => tbody.appendChild(crearFilaHTML(med)));
-        } else {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-slate-500">No se encontraron registros.</td></tr>';
-        }
+        const tbody = document.getElementById('tabla-body'); tbody.innerHTML = '';
+        if (data && data.length > 0) data.forEach(med => tbody.appendChild(crearFilaHTML(med)));
+        else tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-slate-500">No hay registros de este equipo.</td></tr>';
 
-        if(count !== null) {
-            totalRegistros = count;
-            totalPaginas = Math.ceil(totalRegistros / REGISTROS_POR_PAGINA) || 1;
-        }
-
-        document.getElementById('input-page').value = paginaActual;
-        document.getElementById('total-pages-info').innerText = `de ${totalPaginas}`;
+        if(count !== null) { totalRegistros = count; totalPaginas = Math.ceil(totalRegistros / REGISTROS_POR_PAGINA) || 1; }
+        document.getElementById('input-page').value = paginaActual; document.getElementById('total-pages-info').innerText = `de ${totalPaginas}`;
         document.getElementById('total-records-info').innerText = `${totalRegistros} registros`;
-        
-        document.getElementById('btn-prev').disabled = paginaActual === 1;
-        document.getElementById('btn-next').disabled = paginaActual >= totalPaginas;
+        document.getElementById('btn-prev').disabled = paginaActual === 1; document.getElementById('btn-next').disabled = paginaActual >= totalPaginas;
     }
+    function cambiarPagina(d) { paginaActual += d; cargarPaginaTabla(); }
+    function irAPagina(v) { let p = parseInt(v); if (p >= 1 && p <= totalPaginas) { paginaActual = p; cargarPaginaTabla(); } else document.getElementById('input-page').value = paginaActual; }
+    function cambiarFilas() { REGISTROS_POR_PAGINA = parseInt(document.getElementById('select-rows').value); paginaActual = 1; cargarPaginaTabla(); }
 
-    function cambiarPagina(delta) {
-        paginaActual += delta;
-        cargarPaginaTabla();
-    }
-
-    function irAPagina(val) {
-        let p = parseInt(val);
-        if (p >= 1 && p <= totalPaginas) {
-            paginaActual = p;
-            cargarPaginaTabla();
-        } else {
-            document.getElementById('input-page').value = paginaActual; 
-        }
-    }
-
-    function cambiarFilas() {
-        REGISTROS_POR_PAGINA = parseInt(document.getElementById('select-rows').value);
-        paginaActual = 1;
-        cargarPaginaTabla();
-    }
-
-    // ==========================================
-    // MÓDULO: GRÁFICAS CON ZOOM/PAN
-    // ==========================================
     function inicializarGrafico() {
-        const ctx = document.getElementById('canvas-principal').getContext('2d');
-        const conf = configGraficas[parametroGrafico];
-        
+        const ctx = document.getElementById('canvas-principal').getContext('2d'); const conf = configGraficas[parametroGrafico];
         if(graficoPrincipal) graficoPrincipal.destroy();
-
         graficoPrincipal = new Chart(ctx, {
-            type: 'line',
-            data: { 
-                labels: memoriaGrafica.labels, 
-                datasets: [{ 
-                    label: conf.nombre, 
-                    data: memoriaGrafica[parametroGrafico], 
-                    borderColor: conf.color, 
-                    backgroundColor: conf.color + '22', // Transparencia para fondo oscuro
-                    fill: true, 
-                    tension: 0.4,
-                    pointRadius: limiteGrafica > 100 ? 0 : 3, // Ocultar puntos si hay muchos datos
-                    borderWidth: 2
-                }] 
-            },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false, 
-                animation: { duration: 400 }, 
-                color: '#94a3b8', // Color texto ejes
-                scales: { 
-                    x: { ticks: { maxRotation: 45, minRotation: 45, color: '#94a3b8' }, grid: { color: '#334155' } },
-                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
-                },
-                plugins: {
-                    legend: { labels: { color: '#f8fafc' } },
-                    zoom: {
-                        pan: { enabled: true, mode: 'x' },
-                        zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
-                    }
-                }
-            }
+            type: 'line', data: { labels: memoriaGrafica.labels, datasets: [{ label: conf.nombre, data: memoriaGrafica[parametroGrafico], borderColor: conf.color, backgroundColor: conf.color + '22', fill: true, tension: 0.4, pointRadius: limiteGrafica > 100 ? 0 : 3, borderWidth: 2 }] },
+            options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 }, color: '#94a3b8', scales: { x: { ticks: { maxRotation: 45, minRotation: 45, color: '#94a3b8' }, grid: { color: '#334155' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } } }, plugins: { legend: { labels: { color: '#f8fafc' } }, zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } } } }
         });
     }
-
-    function cambiarParametroGrafico(param, event) {
-        parametroGrafico = param;
-        const conf = configGraficas[param];
-        
-        // Estilos de botones
-        document.querySelectorAll('.btn-chart').forEach(btn => {
-            btn.classList.remove('active', 'bg-red-700', 'text-white', 'border-transparent');
-            btn.classList.add('bg-slate-700', 'text-slate-300', 'border-slate-600');
-        });
-        
-        event.target.classList.remove('bg-slate-700', 'text-slate-300', 'border-slate-600');
-        event.target.classList.add('active', 'bg-red-700', 'text-white', 'border-transparent');
-
-        graficoPrincipal.data.datasets[0].label = conf.nombre;
-        graficoPrincipal.data.datasets[0].data = memoriaGrafica[param];
-        graficoPrincipal.data.datasets[0].borderColor = conf.color;
-        graficoPrincipal.data.datasets[0].backgroundColor = conf.color + '22';
-        graficoPrincipal.update();
-    }
-
-    async function cambiarRangoTiempo(rango, event) {
-        document.querySelectorAll('.btn-time').forEach(btn => {
-            btn.classList.remove('active', 'bg-red-950/30', 'text-red-500', 'border-red-500');
-            btn.classList.add('bg-slate-900', 'text-slate-400', 'border-slate-600');
-        });
-        
-        event.target.classList.remove('bg-slate-900', 'text-slate-400', 'border-slate-600');
-        event.target.classList.add('active', 'bg-red-950/30', 'text-red-500', 'border-red-500');
-
-        if(rango === 'realtime') limiteGrafica = 60;
-        if(rango === 'dia') limiteGrafica = 500;
-        if(rango === 'mes') limiteGrafica = 2000;
-        if(rango === 'ano') limiteGrafica = 5000;
-
-        await cargarMemoriaGrafica();
-    }
-
+    function cambiarParametroGrafico(p, e) { parametroGrafico = p; const conf = configGraficas[p]; document.querySelectorAll('.btn-chart').forEach(b => { b.classList.remove('active', 'bg-red-700', 'text-white', 'border-transparent'); b.classList.add('bg-slate-700', 'text-slate-300', 'border-slate-600'); }); e.target.classList.remove('bg-slate-700', 'text-slate-300', 'border-slate-600'); e.target.classList.add('active', 'bg-red-700', 'text-white', 'border-transparent'); graficoPrincipal.data.datasets[0].label = conf.nombre; graficoPrincipal.data.datasets[0].data = memoriaGrafica[p]; graficoPrincipal.data.datasets[0].borderColor = conf.color; graficoPrincipal.data.datasets[0].backgroundColor = conf.color + '22'; graficoPrincipal.update(); }
+    async function cambiarRangoTiempo(r, e) { document.querySelectorAll('.btn-time').forEach(b => { b.classList.remove('active', 'bg-red-950/30', 'text-red-500', 'border-red-500'); b.classList.add('bg-slate-900', 'text-slate-400', 'border-slate-600'); }); e.target.classList.remove('bg-slate-900', 'text-slate-400', 'border-slate-600'); e.target.classList.add('active', 'bg-red-950/30', 'text-red-500', 'border-red-500'); if(r === 'realtime') limiteGrafica = 60; if(r === 'dia') limiteGrafica = 500; if(r === 'mes') limiteGrafica = 2000; await cargarMemoriaGrafica(); }
+    
     async function cargarMemoriaGrafica() {
-        const { data } = await db
-            .from('mediciones')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(limiteGrafica);
-
-        // Limpiar
-        for(let key in memoriaGrafica) memoriaGrafica[key] = [];
-
-        if (data) {
-            [...data].reverse().forEach(med => {
-                const objFecha = new Date(med.created_at);
-                const etiqueta = limiteGrafica <= 60 ? objFecha.toLocaleTimeString() : objFecha.toLocaleString();
-                
-                memoriaGrafica.labels.push(etiqueta);
-                memoriaGrafica.voltaje.push(med.voltaje); 
-                memoriaGrafica.corriente.push(med.corriente);
-                memoriaGrafica.potencia.push(med.potencia); 
-                memoriaGrafica.energia.push(med.energia);
-                memoriaGrafica.frecuencia.push(med.frecuencia); 
-                memoriaGrafica.factor_potencia.push(med.factor_potencia);
-            });
-        }
+        const { data } = await db.from('mediciones').select('*').eq('dispositivo_id', activeDeviceId).order('created_at', { ascending: false }).limit(limiteGrafica);
+        for(let k in memoriaGrafica) memoriaGrafica[k] = [];
+        if (data) { [...data].reverse().forEach(m => { const d = new Date(m.created_at); memoriaGrafica.labels.push(limiteGrafica <= 60 ? d.toLocaleTimeString() : d.toLocaleString()); memoriaGrafica.voltaje.push(m.voltaje); memoriaGrafica.corriente.push(m.corriente); memoriaGrafica.potencia.push(m.potencia); memoriaGrafica.energia.push(m.energia); memoriaGrafica.frecuencia.push(m.frecuencia); memoriaGrafica.factor_potencia.push(m.factor_potencia); }); }
         inicializarGrafico();
     }
 
-    // ==========================================
-    // WEBSOCKET (TIEMPO REAL)
-    // ==========================================
+    let subChannel;
     function iniciarSuscripcionWebsocket() {
-        db.channel('mediciones-channel')
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, procesarNuevoDato)
-          .subscribe((status) => {
-              if(status === 'SUBSCRIBED') {
-                  document.getElementById('conexion-status').innerText = "Conectado. Recibiendo datos en tiempo real...";
-                  document.getElementById('conexion-status').classList.replace('text-emerald-400', 'text-emerald-500');
-              }
-          });
-    }
-
-    function procesarNuevoDato(payload) {
-        const datos = payload.new;
-        const horaStr = new Date(datos.created_at).toLocaleTimeString();
-        
-        // 1. Tarjetas Superiores
-        document.getElementById('val-voltaje').innerText = datos.voltaje; 
-        document.getElementById('val-corriente').innerText = datos.corriente;
-        document.getElementById('val-potencia').innerText = datos.potencia; 
-        document.getElementById('val-energia').innerText = datos.energia;
-        document.getElementById('val-frecuencia').innerText = datos.frecuencia; 
-        document.getElementById('val-pf').innerText = datos.factor_potencia;
-
-        // 2. Tabla (Si no hay filtros aplicados y está en la hoja 1)
-        if (paginaActual === 1 && fParam === 'created_at' && fOrdenDesc && !fFecha) {
-            const tbody = document.getElementById('tabla-body');
-            tbody.prepend(crearFilaHTML(datos));
-            if (tbody.children.length > REGISTROS_POR_PAGINA) tbody.removeChild(tbody.lastChild);
+        if(subChannel) db.removeChannel(subChannel);
+        subChannel = db.channel('mediciones-channel').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, (payload) => {
+            // Filtrar en el cliente: ignorar si el dato es de un equipo que no estoy viendo ahora mismo
+            if(payload.new.dispositivo_id !== activeDeviceId) return;
             
-            totalRegistros++;
-            document.getElementById('total-records-info').innerText = `${totalRegistros} registros`;
-        }
-
-        // 3. Gráficas (Solo si está en vista "Tiempo Real")
-        if(limiteGrafica === 60) {
-            memoriaGrafica.labels.push(horaStr); 
-            memoriaGrafica.voltaje.push(datos.voltaje);
-            memoriaGrafica.corriente.push(datos.corriente); 
-            memoriaGrafica.potencia.push(datos.potencia);
-            memoriaGrafica.energia.push(datos.energia); 
-            memoriaGrafica.frecuencia.push(datos.frecuencia);
-            memoriaGrafica.factor_potencia.push(datos.factor_potencia);
-
-            if (memoriaGrafica.labels.length > limiteGrafica) {
-                memoriaGrafica.labels.shift(); memoriaGrafica.voltaje.shift(); memoriaGrafica.corriente.shift();
-                memoriaGrafica.potencia.shift(); memoriaGrafica.energia.shift(); memoriaGrafica.frecuencia.shift(); memoriaGrafica.factor_potencia.shift();
-            }
-            if(graficoPrincipal) graficoPrincipal.update();
-        }
+            const d = payload.new; const h = new Date(d.created_at).toLocaleTimeString();
+            document.getElementById('val-voltaje').innerText = d.voltaje; document.getElementById('val-corriente').innerText = d.corriente; document.getElementById('val-potencia').innerText = d.potencia; document.getElementById('val-energia').innerText = d.energia; document.getElementById('val-frecuencia').innerText = d.frecuencia; document.getElementById('val-pf').innerText = d.factor_potencia;
+            
+            if (paginaActual === 1 && fParam === 'created_at' && fOrdenDesc && !fFecha) { const tb = document.getElementById('tabla-body'); tb.prepend(crearFilaHTML(d)); if (tb.children.length > REGISTROS_POR_PAGINA) tb.removeChild(tb.lastChild); totalRegistros++; document.getElementById('total-records-info').innerText = `${totalRegistros} registros`; }
+            if(limiteGrafica === 60) { memoriaGrafica.labels.push(h); memoriaGrafica.voltaje.push(d.voltaje); memoriaGrafica.corriente.push(d.corriente); memoriaGrafica.potencia.push(d.potencia); memoriaGrafica.energia.push(d.energia); memoriaGrafica.frecuencia.push(d.frecuencia); memoriaGrafica.factor_potencia.push(d.factor_potencia); if (memoriaGrafica.labels.length > 60) { memoriaGrafica.labels.shift(); memoriaGrafica.voltaje.shift(); memoriaGrafica.corriente.shift(); memoriaGrafica.potencia.shift(); memoriaGrafica.energia.shift(); memoriaGrafica.frecuencia.shift(); memoriaGrafica.factor_potencia.shift(); } if(graficoPrincipal) graficoPrincipal.update(); }
+        }).subscribe((s) => { if(s === 'SUBSCRIBED') document.getElementById('conexion-status').innerText = "Conectado. Recibiendo datos en vivo del equipo..."; });
     }
   </script>
 </body>
