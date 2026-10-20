@@ -70,24 +70,26 @@
     </div>
   </div>
 
-  <!-- ================= MODAL DE EQUIPOS (VINCULACIÓN) ================= -->
+  <!-- ================= MODAL DE EQUIPOS (VINCULACIÓN DINÁMICA) ================= -->
   <div id="modal-equipos" class="fixed inset-0 z-[200] bg-slate-900/95 hidden flex flex-col justify-center items-center p-4">
-    <div class="bg-slate-800 p-6 rounded-2xl border border-red-500 shadow-2xl w-full max-w-sm relative">
+    <div class="bg-slate-800 p-6 rounded-2xl border border-red-500 shadow-2xl w-full max-w-sm relative text-center">
       <button onclick="cerrarModalEquipos()" id="btn-close-equipos" class="absolute top-3 right-4 text-2xl font-black text-slate-400 hover:text-white">&times;</button>
-      <h2 class="text-xl font-black text-red-500 mb-2">Vincular Equipo</h2>
-      <p class="text-[11px] text-slate-400 mb-4">Ingresa el ID único de tu medidor MAGOM y asígnale un nombre.</p>
+      <h2 class="text-xl font-black text-red-500 mb-2">Vincular Nuevo Medidor</h2>
       
-      <input type="text" id="eq-id" placeholder="ID del Equipo (Ej: MAGOM_A1B2)" class="w-full bg-slate-700 p-3 rounded-lg mb-3 text-white uppercase outline-none focus:border-red-500">
-      <input type="text" id="eq-nombre" placeholder="Nombre (Ej: Principal, Local 1)" class="w-full bg-slate-700 p-3 rounded-lg mb-4 text-white outline-none focus:border-red-500">
-      <button onclick="vincularEquipo()" id="btn-vincular" class="w-full bg-red-700 hover:bg-red-600 py-3 rounded-lg font-bold text-white shadow-lg transition-colors">Vincular Medidor</button>
+      <div class="bg-slate-900 border border-slate-700 p-4 rounded-lg mb-4 text-left">
+          <p class="text-[12px] text-slate-300 mb-2"><span class="text-red-500 font-bold">Paso 1:</span> Conecta este dispositivo a la red WiFi llamada <b>MAGOM_Medidor</b>.</p>
+          <p class="text-[12px] text-slate-300 mb-2"><span class="text-red-500 font-bold">Paso 2:</span> Se abrirá una pantalla de configuración. Ingresa la clave de tu WiFi local.</p>
+          <p class="text-[12px] text-slate-300"><span class="text-red-500 font-bold">Paso 3:</span> En esa misma pantalla, escribe tu correo registrado: <br><b class="text-emerald-400" id="correo-usuario-actual"></b></p>
+      </div>
+      
+      <button onclick="location.reload()" class="w-full bg-red-700 hover:bg-red-600 py-3 rounded-lg font-bold text-white shadow-lg transition-colors">Ya lo configuré (Refrescar)</button>
       
       <div class="mt-4 pt-4 border-t border-slate-700" id="seccion-mis-equipos">
-          <h3 class="text-xs font-bold text-slate-400 mb-2">Mis Equipos Actuales:</h3>
-          <div id="lista-mis-equipos" class="space-y-2 max-h-32 overflow-y-auto no-scrollbar"></div>
+          <h3 class="text-xs font-bold text-slate-400 mb-2 text-left">Mis Equipos Actuales:</h3>
+          <div id="lista-mis-equipos" class="space-y-2 max-h-32 overflow-y-auto no-scrollbar text-left"></div>
       </div>
     </div>
   </div>
-
   <!-- ================= HEADER PRINCIPAL MULTIDISPOSITIVO ================= -->
   <header class="p-4 bg-slate-800 border-b border-slate-700 sticky top-0 z-10 flex justify-between items-center shadow-md hidden" id="main-header">
     <div class="flex flex-col">
@@ -216,6 +218,7 @@
 
     async function gestionarSesion(user) {
         authUser = user;
+        document.getElementById('correo-usuario-actual').innerText = authUser.email;
         document.getElementById('auth-screen').classList.add('hidden');
         document.getElementById('splash-screen').classList.remove('hidden');
 
