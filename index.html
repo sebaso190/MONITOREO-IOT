@@ -1,447 +1,715 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Eléctrico IoT</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>MAGOM - Monitoreo IoT</title>
+  
+  <!-- Tailwind CSS para el diseño -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Supabase y Chart.js con Plugins de Zoom/Desplazamiento -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+
+  <style>
+    .hidden { display: none !important; }
+    body { font-family: system-ui, -apple-system, sans-serif; background-color: #0f172a; color: #f8fafc; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     
-    <!-- Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    /* Animación de Carga */
+    .loader-dots div { animation-timing-function: cubic-bezier(0, 1, 1, 0); }
+    .loader-dots div:nth-child(1) { left: 8px; animation: loader-dots1 0.6s infinite; }
+    .loader-dots div:nth-child(2) { left: 8px; animation: loader-dots2 0.6s infinite; }
+    .loader-dots div:nth-child(3) { left: 32px; animation: loader-dots2 0.6s infinite; }
+    .loader-dots div:nth-child(4) { left: 56px; animation: loader-dots3 0.6s infinite; }
+    @keyframes loader-dots1 { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+    @keyframes loader-dots3 { 0% { transform: scale(1); } 100% { transform: scale(0); } }
+    @keyframes loader-dots2 { 0% { transform: translate(0, 0); } 100% { transform: translate(24px, 0); } }
+
+    /* Estilos Custom de la Tabla y Paginación (Modo Oscuro) */
+    .table-container { width: 100%; overflow-x: auto; background: #1e293b; border-radius: 0.5rem; border: 1px solid #334155; }
+    table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.85rem; min-width: 700px; color: #cbd5e1; }
+    th, td { padding: 12px; border-bottom: 1px solid #334155; }
+    th { background-color: #0f172a; color: #f8fafc; font-weight: bold; }
     
-    <!-- Chart.js y Plugins para hacer Zoom y Desplazamiento (Pan) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
-
-    <style>
-        body { font-family: system-ui, sans-serif; background: #f4f4f9; padding: 15px; margin: 0; }
-        .tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
-        .tab-btn { padding: 10px 20px; cursor: pointer; background: #ddd; border: none; border-radius: 5px; font-weight: bold; transition: 0.3s; }
-        .tab-btn.active { background: #007bff; color: white; }
-        .view { display: none; animation: fadeIn 0.3s; }
-        .view.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; max-width: 1000px; margin: 0 auto; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-        .valor { font-size: 2em; font-weight: bold; color: #007bff; margin: 10px 0; }
-        .unidad { font-size: 0.9em; color: #666; }
-        .status { text-align: center; margin-bottom: 20px; color: #28a745; font-weight: bold; }
-        
-        /* Controles de Filtro */
-        .filter-bar { max-width: 1000px; margin: 0 auto 15px auto; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .filter-bar select, .filter-bar input { padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.9em; flex-grow: 1; }
-        .btn-filter { padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .btn-clear { padding: 8px 15px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        
-        /* Tabla Histórico */
-        .table-container { max-width: 1000px; margin: 0 auto; overflow-x: auto; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9em; min-width: 600px; }
-        th, td { padding: 12px; border-bottom: 1px solid #ddd; }
-        th { background-color: #f8f9fa; color: #333; }
-        
-        /* PAGINACIÓN ESTILO CONSOLA OSCURA */
-        .pagination-dark {
-            background: #1e1e1e; color: #e0e0e0; max-width: 1000px; margin: 15px auto 0 auto;
-            display: flex; align-items: center; justify-content: flex-start; gap: 12px;
-            padding: 12px 20px; border-radius: 8px; font-size: 14px; flex-wrap: wrap;
-        }
-        .btn-icon {
-            background: transparent; color: #e0e0e0; border: 1px solid #444; border-radius: 6px;
-            width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: 0.2s; font-size: 16px;
-        }
-        .btn-icon:hover:not(:disabled) { background: #333; border-color: #666; }
-        .btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
-        .page-input {
-            background: #111; color: #fff; border: 1px solid #444; border-radius: 6px;
-            width: 40px; text-align: center; padding: 6px; font-weight: bold; outline: none;
-        }
-        .page-input:focus { border-color: #007bff; }
-        .rows-select {
-            background: #111; color: #fff; border: 1px solid #444; border-radius: 6px;
-            padding: 6px 10px; cursor: pointer; font-weight: bold; outline: none; margin-left: 10px;
-        }
-        .records-info { color: #888; margin-left: 15px; }
-
-        /* Gráficas */
-        .chart-controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-        .btn-chart { padding: 8px 15px; background: #e9ecef; border: 1px solid #ccc; border-radius: 20px; cursor: pointer; font-weight: bold; }
-        .btn-chart.active { background: #343a40; color: white; border-color: #343a40; }
-        
-        .time-controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
-        .btn-time { padding: 6px 12px; background: #fff; border: 1px solid #007bff; color: #007bff; border-radius: 5px; cursor: pointer; font-size: 0.9em; font-weight: bold; }
-        .btn-time.active { background: #007bff; color: white; }
-
-        .chart-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 1000px; margin: 0 auto; }
-        .chart-wrapper { position: relative; width: 100%; height: 60vh; min-height: 400px; }
-        .grafica-hint { text-align: center; color: #888; font-size: 0.8em; margin-top: 10px; }
-    </style>
+    .pagination-dark {
+        background: #0f172a; color: #e0e0e0; margin-top: 15px; border: 1px solid #334155;
+        display: flex; align-items: center; justify-content: flex-start; gap: 12px;
+        padding: 12px 15px; border-radius: 0.5rem; font-size: 13px; flex-wrap: wrap;
+    }
+    .btn-icon {
+        background: transparent; color: #e0e0e0; border: 1px solid #475569; border-radius: 6px;
+        width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: 0.2s; font-size: 16px;
+    }
+    .btn-icon:hover:not(:disabled) { background: #334155; border-color: #64748b; }
+    .btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
+    .page-input {
+        background: #020617; color: #fff; border: 1px solid #475569; border-radius: 6px;
+        width: 45px; text-align: center; padding: 6px; font-weight: bold; outline: none;
+    }
+    .page-input:focus { border-color: #ef4444; }
+    .rows-select {
+        background: #020617; color: #fff; border: 1px solid #475569; border-radius: 6px;
+        padding: 6px 10px; cursor: pointer; font-weight: bold; outline: none;
+    }
+  </style>
 </head>
-<body>
+<body class="pb-24 overflow-x-hidden">
 
-    <h1 style="text-align: center;">Monitor de Energía IoT</h1>
+  <!-- ================= SPLASH/LOADING SCREEN CON DETECTOR DE ERRORES ================= -->
+  <div id="splash-screen" class="fixed inset-0 z-[500] bg-slate-900 flex flex-col justify-center items-center p-6 transition-opacity duration-300">
+    <h1 class="text-4xl font-black text-center text-red-600 mb-2 tracking-widest animate-pulse">MAGOM</h1>
+    <p class="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-4" id="splash-msg">Verificando sesión...</p>
+    <div class="mt-4 loader-dots relative w-16 h-5">
+      <div class="absolute top-1 w-2.5 h-2.5 rounded-full bg-red-600"></div><div class="absolute top-1 w-2.5 h-2.5 rounded-full bg-red-600"></div>
+      <div class="absolute top-1 w-2.5 h-2.5 rounded-full bg-red-600"></div><div class="absolute top-1 w-2.5 h-2.5 rounded-full bg-red-600"></div>
+    </div>
+  </div>
+
+  <!-- ================= PANTALLA DE AUTENTICACIÓN ================= -->
+  <div id="auth-screen" class="fixed inset-0 z-[100] bg-slate-900 flex flex-col justify-center items-center p-6 hidden">
+    <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-sm">
+      <h1 class="text-4xl font-black text-center text-red-600 mb-2 tracking-widest">MAGOM</h1>
+      <p class="text-center text-slate-400 text-sm mb-6 uppercase tracking-widest">Monitoreo IoT</p>
+      
+      <input type="email" id="auth-email" placeholder="Correo electrónico" class="w-full bg-slate-700 p-3 rounded-lg mb-3 text-white outline-none focus:border-red-500 border border-transparent transition">
+      <input type="password" id="auth-pass" placeholder="Contraseña" class="w-full bg-slate-700 p-3 rounded-lg mb-6 text-white outline-none focus:border-red-500 border border-transparent transition">
+      
+      <button id="btn-login" onclick="login()" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded-lg mb-3 transition shadow-lg">Iniciar Sesión</button>
+      <button id="btn-register" onclick="register()" class="w-full bg-slate-700 hover:bg-slate-600 text-red-400 font-bold py-3 rounded-lg transition border border-slate-600">Crear Cuenta</button>
+      
+      <div class="flex justify-between items-center mt-4 border-t border-slate-700 pt-4">
+        <button onclick="solicitarRecuperacionOTP()" class="text-xs text-slate-400 hover:text-white underline transition">¿Olvidó su clave?</button>
+        <button onclick="contactarSoporte()" class="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition">💬 Soporte WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL RECUPERACIÓN OTP ================= -->
+  <div id="modal-recuperacion-otp" class="fixed inset-0 z-[300] bg-slate-900/95 hidden flex flex-col justify-center items-center p-4">
+    <div class="bg-slate-800 p-6 rounded-2xl border border-red-500 shadow-2xl w-full max-w-sm text-center relative">
+      <button onclick="cerrarRecuperacionOTP()" class="absolute top-3 right-4 text-2xl font-black text-slate-400 hover:text-white">&times;</button>
+      <h2 class="text-xl font-black text-red-500 mb-2">Recuperar Contraseña</h2>
+      <p class="text-[11px] text-slate-400 mb-4">Hemos enviado un código de 8 dígitos a tu correo. Ingrésalo aquí junto con tu nueva contraseña.</p>
+      <input type="text" id="otp-codigo" placeholder="Código numérico" maxlength="8" inputmode="numeric" pattern="[0-9]*" class="w-full bg-slate-700 p-3 rounded-lg mb-3 text-center text-xl font-bold tracking-[0.25em] text-red-400 outline-none focus:border-red-500 border border-transparent">
+      <input type="password" id="otp-nueva-pass" placeholder="Nueva contraseña (mínimo 6 caracteres)" class="w-full bg-slate-700 p-3 rounded-lg mb-6 text-white outline-none focus:border-red-500 border border-transparent text-sm">
+      <button id="btn-confirmar-otp" onclick="verificarYCambiarPassword()" class="w-full bg-red-700 hover:bg-red-600 py-3 rounded-lg font-bold text-white shadow-lg transition-colors">Verificar y Cambiar</button>
+    </div>
+  </div>
+
+  <!-- ================= HEADER PRINCIPAL ================= -->
+  <header class="p-4 bg-slate-800 border-b border-slate-700 sticky top-0 z-10 flex justify-between items-center shadow-md hidden" id="main-header">
+    <div>
+        <h1 class="font-black text-lg text-red-500 tracking-wider">MAGOM</h1>
+        <p class="text-[10px] text-slate-400">Medidor Eléctrico Inteligente</p>
+    </div>
+    <div class="flex items-center gap-2">
+       <button onclick="logout()" class="text-xs bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 px-3 py-1.5 rounded-lg font-bold shadow">Cerrar Sesión</button>
+    </div>
+  </header>
+
+  <!-- ================= CONTENEDOR PRINCIPAL DE LA APP ================= -->
+  <main class="p-4 max-w-4xl mx-auto relative hidden" id="main-app">
     
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('realtime', event)">Tiempo Real</button>
-        <button class="tab-btn" onclick="switchTab('history', event)">Historial y Filtros</button>
-        <button class="tab-btn" onclick="switchTab('charts', event)">Gráfica Dinámica</button>
-    </div>
-
-    <div id="conexion-status" class="status">Conectando a la base de datos...</div>
-
-    <!-- Vista 1: Tiempo Real -->
-    <div id="realtime" class="view active">
-        <div class="grid">
-            <div class="card"><h3>Voltaje</h3><div class="valor" id="val-voltaje">0</div><div class="unidad">V</div></div>
-            <div class="card"><h3>Corriente</h3><div class="valor" id="val-corriente">0</div><div class="unidad">A</div></div>
-            <div class="card"><h3>Potencia</h3><div class="valor" id="val-potencia">0</div><div class="unidad">W</div></div>
-            <div class="card"><h3>Energía</h3><div class="valor" id="val-energia">0</div><div class="unidad">kWh</div></div>
-            <div class="card"><h3>Frecuencia</h3><div class="valor" id="val-frecuencia">0</div><div class="unidad">Hz</div></div>
-            <div class="card"><h3>Factor Potencia</h3><div class="valor" id="val-pf">0</div><div class="unidad">PF</div></div>
+    <!-- VISTA 1: TIEMPO REAL -->
+    <section id="view-realtime" class="vista-seccion space-y-4">
+      <div id="conexion-status" class="bg-slate-800 border border-slate-700 p-3 rounded-lg text-center text-xs font-bold text-emerald-400 shadow-sm">
+          Conectando al medidor...
+      </div>
+      
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
+            <h3 class="text-xs font-bold text-slate-400 uppercase">Voltaje</h3>
+            <div class="text-3xl font-black text-blue-400 my-1" id="val-voltaje">0</div>
+            <div class="text-[10px] text-slate-500">Voltios (V)</div>
         </div>
-    </div>
-
-    <!-- Vista 2: Historial con Filtros y Paginación Oscura -->
-    <div id="history" class="view">
-        <div class="filter-bar">
-            <label>Fecha:</label>
-            <input type="date" id="filtro-fecha">
-            <label>Ordenar por:</label>
-            <select id="filtro-parametro">
-                <option value="created_at">Hora de Registro</option>
-                <option value="voltaje">Voltaje</option>
-                <option value="corriente">Corriente</option>
-                <option value="potencia">Potencia</option>
-                <option value="energia">Energía</option>
-            </select>
-            <select id="filtro-orden">
-                <option value="desc">De Mayor a Menor (Desc)</option>
-                <option value="asc">De Menor a Mayor (Asc)</option>
-            </select>
-            <button class="btn-filter" onclick="aplicarFiltros()">Aplicar Filtros</button>
-            <button class="btn-clear" onclick="limpiarFiltros()">Limpiar</button>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
+            <h3 class="text-xs font-bold text-slate-400 uppercase">Corriente</h3>
+            <div class="text-3xl font-black text-yellow-400 my-1" id="val-corriente">0</div>
+            <div class="text-[10px] text-slate-500">Amperios (A)</div>
         </div>
-
-        <div class="table-container">
-            <table id="tabla-historico">
-                <thead>
-                    <tr>
-                        <th>Fecha</th><th>Hora (NTP)</th><th>Voltaje (V)</th><th>Corriente (A)</th>
-                        <th>Potencia (W)</th><th>Energía (kWh)</th><th>Frec. (Hz)</th><th>FP</th>
-                    </tr>
-                </thead>
-                <tbody id="tabla-body"></tbody>
-            </table>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
+            <h3 class="text-xs font-bold text-slate-400 uppercase">Potencia</h3>
+            <div class="text-3xl font-black text-orange-400 my-1" id="val-potencia">0</div>
+            <div class="text-[10px] text-slate-500">Vatios (W)</div>
         </div>
-        
-        <!-- Paginación Estilo Consola Oscura -->
-        <div class="pagination-dark">
-            <button class="btn-icon" id="btn-prev" onclick="cambiarPagina(-1)">←</button>
-            <span>Página</span>
-            <input type="number" id="input-page" class="page-input" value="1" min="1" onchange="irAPagina(this.value)">
-            <span id="total-pages-info">de 1</span>
-            <button class="btn-icon" id="btn-next" onclick="cambiarPagina(1)">→</button>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
+            <h3 class="text-xs font-bold text-slate-400 uppercase">Energía</h3>
+            <div class="text-3xl font-black text-emerald-400 my-1" id="val-energia">0</div>
+            <div class="text-[10px] text-slate-500">kWh</div>
+        </div>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
+            <h3 class="text-xs font-bold text-slate-400 uppercase">Frecuencia</h3>
+            <div class="text-3xl font-black text-purple-400 my-1" id="val-frecuencia">0</div>
+            <div class="text-[10px] text-slate-500">Hertz (Hz)</div>
+        </div>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg text-center">
+            <h3 class="text-xs font-bold text-slate-400 uppercase">Factor Potencia</h3>
+            <div class="text-3xl font-black text-teal-400 my-1" id="val-pf">0</div>
+            <div class="text-[10px] text-slate-500">PF</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISTA 2: HISTORIAL Y TABLAS -->
+    <section id="view-history" class="vista-seccion space-y-4 hidden">
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+            <div class="flex flex-wrap gap-2 items-end mb-4">
+                <div class="flex-1 min-w-[120px]">
+                    <label class="text-[10px] text-slate-400 uppercase font-bold">Fecha Exacta</label>
+                    <input type="date" id="filtro-fecha" class="w-full bg-slate-900 p-2 rounded border border-slate-600 text-sm outline-none focus:border-red-500 text-white">
+                </div>
+                <div class="flex-1 min-w-[120px]">
+                    <label class="text-[10px] text-slate-400 uppercase font-bold">Ordenar Por</label>
+                    <select id="filtro-parametro" class="w-full bg-slate-900 p-2 rounded border border-slate-600 text-sm outline-none focus:border-red-500 text-white">
+                        <option value="created_at">Hora de Registro</option>
+                        <option value="voltaje">Voltaje</option>
+                        <option value="corriente">Corriente</option>
+                        <option value="potencia">Potencia</option>
+                        <option value="energia">Energía</option>
+                    </select>
+                </div>
+                <div class="flex-1 min-w-[140px]">
+                    <label class="text-[10px] text-slate-400 uppercase font-bold">Dirección</label>
+                    <select id="filtro-orden" class="w-full bg-slate-900 p-2 rounded border border-slate-600 text-sm outline-none focus:border-red-500 text-white">
+                        <option value="desc">Mayor a Menor</option>
+                        <option value="asc">Menor a Mayor</option>
+                    </select>
+                </div>
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <button onclick="aplicarFiltros()" class="flex-1 sm:flex-none bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded font-bold text-sm shadow">Filtrar</button>
+                    <button onclick="limpiarFiltros()" class="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded font-bold text-sm shadow">Limpiar</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="tabla-historico">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th><th>Hora (NTP)</th><th>Voltaje (V)</th><th>Corriente (A)</th>
+                            <th>Potencia (W)</th><th>Energía (kWh)</th><th>Frec. (Hz)</th><th>FP</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-body"></tbody>
+                </table>
+            </div>
             
-            <select id="select-rows" class="rows-select" onchange="cambiarFilas()">
-                <option value="20">20 filas</option>
-                <option value="50">50 filas</option>
-                <option value="100">100 filas</option>
-                <option value="500">500 filas</option>
-            </select>
+            <!-- Paginación Estilo Consola Oscura -->
+            <div class="pagination-dark">
+                <button class="btn-icon" id="btn-prev" onclick="cambiarPagina(-1)">←</button>
+                <span>Página</span>
+                <input type="number" id="input-page" class="page-input" value="1" min="1" onchange="irAPagina(this.value)">
+                <span id="total-pages-info" class="text-slate-400">de 1</span>
+                <button class="btn-icon" id="btn-next" onclick="cambiarPagina(1)">→</button>
+                
+                <select id="select-rows" class="rows-select ml-auto" onchange="cambiarFilas()">
+                    <option value="20">20 filas</option>
+                    <option value="50">50 filas</option>
+                    <option value="100">100 filas</option>
+                    <option value="500">500 filas</option>
+                </select>
+                <span class="text-slate-400 ml-2" id="total-records-info">0 registros</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- VISTA 3: GRÁFICAS -->
+    <section id="view-charts" class="vista-seccion space-y-4 hidden">
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
             
-            <span class="records-info" id="total-records-info">0 registros</span>
-        </div>
-    </div>
+            <div class="flex flex-wrap justify-center gap-2 mb-4" id="chart-buttons">
+                <button class="btn-chart active text-sm bg-red-700 text-white px-4 py-1.5 rounded-full font-bold shadow" onclick="cambiarParametroGrafico('voltaje', event)">Voltaje</button>
+                <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('corriente', event)">Corriente</button>
+                <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('potencia', event)">Potencia</button>
+                <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('energia', event)">Energía</button>
+                <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('frecuencia', event)">Frecuencia</button>
+                <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('factor_potencia', event)">F.P.</button>
+            </div>
+            
+            <div class="flex flex-wrap justify-center gap-2 mb-4 border-b border-slate-700 pb-4">
+                <button class="btn-time active text-xs border border-red-500 text-red-500 bg-red-950/30 px-3 py-1 rounded" onclick="cambiarRangoTiempo('realtime', event)">Tiempo Real</button>
+                <button class="btn-time text-xs border border-slate-600 text-slate-400 bg-slate-900 px-3 py-1 rounded" onclick="cambiarRangoTiempo('dia', event)">Último Día</button>
+                <button class="btn-time text-xs border border-slate-600 text-slate-400 bg-slate-900 px-3 py-1 rounded" onclick="cambiarRangoTiempo('mes', event)">Último Mes</button>
+                <button class="btn-time text-xs border border-slate-600 text-slate-400 bg-slate-900 px-3 py-1 rounded" onclick="cambiarRangoTiempo('ano', event)">Último Año</button>
+            </div>
 
-    <!-- Vista 3: Gráfica Dinámica Gigante con Scroll y Tiempos -->
-    <div id="charts" class="view">
-        <div class="chart-controls">
-            <button class="btn-chart active" onclick="cambiarParametroGrafico('voltaje', event)">Voltaje</button>
-            <button class="btn-chart" onclick="cambiarParametroGrafico('corriente', event)">Corriente</button>
-            <button class="btn-chart" onclick="cambiarParametroGrafico('potencia', event)">Potencia</button>
-            <button class="btn-chart" onclick="cambiarParametroGrafico('energia', event)">Energía</button>
-            <button class="btn-chart" onclick="cambiarParametroGrafico('frecuencia', event)">Frecuencia</button>
-            <button class="btn-chart" onclick="cambiarParametroGrafico('factor_potencia', event)">Factor de Potencia</button>
-        </div>
-        
-        <div class="time-controls">
-            <button class="btn-time active" onclick="cambiarRangoTiempo('realtime', event)">Tiempo Real (Últimos 60)</button>
-            <button class="btn-time" onclick="cambiarRangoTiempo('dia', event)">1 Día</button>
-            <button class="btn-time" onclick="cambiarRangoTiempo('mes', event)">1 Mes</button>
-            <button class="btn-time" onclick="cambiarRangoTiempo('ano', event)">1 Año</button>
-        </div>
-
-        <div class="chart-card">
-            <div class="chart-wrapper">
+            <div class="relative w-full h-[50vh] min-h-[350px]">
                 <canvas id="canvas-principal"></canvas>
             </div>
-            <div class="grafica-hint">
-                💡 <b>Consejo:</b> Puedes hacer clic y arrastrar horizontalmente sobre la gráfica para explorar fechas anteriores, o usar la rueda del ratón para hacer zoom.
-            </div>
+            <p class="text-center text-slate-400 text-[10px] mt-4">💡 <b>Tip:</b> Arrastra horizontalmente la gráfica o usa la rueda del ratón para hacer zoom.</p>
         </div>
-    </div>
+    </section>
 
-    <script>
-        const SUPABASE_URL = 'https://jhhwfpdirkqknuepqpzv.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_bWL26c7cp7NEhc_6odLRKg_4inoIAuM';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        const statusDiv = document.getElementById('conexion-status');
+  </main>
 
-        // Variables de Estado para Paginación
-        let paginaActual = 1;
-        let REGISTROS_POR_PAGINA = 20;
-        let totalRegistros = 0;
-        let totalPaginas = 1;
+  <!-- ================= NAVEGACIÓN INFERIOR (BOTTOM NAV) ================= -->
+  <nav class="fixed bottom-0 w-full bg-slate-800 border-t border-slate-700 flex justify-around p-2 pb-6 text-[10px] shadow-2xl z-10 hidden" id="main-nav">
+    <button onclick="cambiarVista('realtime')" id="nav-realtime" class="nav-btn text-red-500 flex flex-col items-center gap-1 font-bold transition-colors">
+        <span class="text-xl">⚡</span><span>Monitoreo</span>
+    </button>
+    <button onclick="cambiarVista('history')" id="nav-history" class="nav-btn text-slate-400 flex flex-col items-center gap-1 font-bold transition-colors">
+        <span class="text-xl">📋</span><span>Historial</span>
+    </button>
+    <button onclick="cambiarVista('charts')" id="nav-charts" class="nav-btn text-slate-400 flex flex-col items-center gap-1 font-bold transition-colors">
+        <span class="text-xl">📈</span><span>Gráficas</span>
+    </button>
+  </nav>
+
+  <script>
+    // ==========================================
+    // SISTEMA DE DETECCIÓN DE ERRORES
+    // ==========================================
+    window.onerror = function(msg, url, line) {
+      const splash = document.getElementById('splash-screen');
+      if (splash) {
+        splash.classList.remove('hidden');
+        splash.innerHTML = `<div class="bg-slate-800 p-6 rounded-2xl border-2 border-red-500 shadow-2xl w-full max-w-sm text-center m-4"><h3 class="text-red-500 font-bold mb-2 uppercase tracking-wide">Error Detectado</h3><p class="text-xs text-slate-300 break-words mb-4 text-left">${msg}<br><br>Línea: ${line}</p><button onclick="location.reload()" class="w-full bg-red-700 text-white font-bold py-3 rounded-lg">Reintentar</button></div>`;
+      }
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      const splash = document.getElementById('splash-screen');
+      if (splash) {
+        splash.classList.remove('hidden');
+        splash.innerHTML = `<div class="bg-slate-800 p-6 rounded-2xl border-2 border-red-500 shadow-2xl w-full max-w-sm text-center m-4"><h3 class="text-red-500 font-bold mb-2 uppercase tracking-wide">Error de Conexión</h3><p class="text-xs text-slate-300 break-words mb-4 text-left">${e.reason}</p><button onclick="location.reload()" class="w-full bg-red-700 text-white font-bold py-3 rounded-lg">Reintentar</button></div>`;
+      }
+    });
+
+    // ==========================================
+    // VARIABLES GLOBALES Y SUPABASE (PROYECTO MEDIDOR)
+    // ==========================================
+    const SUPABASE_URL = 'https://jhhwfpdirkqknuepqpzv.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_bWL26c7cp7NEhc_6odLRKg_4inoIAuM';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Variables Paginación Tabla
+    let paginaActual = 1;
+    let REGISTROS_POR_PAGINA = 20;
+    let totalRegistros = 0;
+    let totalPaginas = 1;
+    
+    // Variables Filtros Tabla
+    let fFecha = '';
+    let fParam = 'created_at';
+    let fOrdenDesc = true;
+
+    // Variables Gráficas
+    let graficoPrincipal;
+    let parametroGrafico = 'voltaje';
+    let limiteGrafica = 60; // 60 datos para Tiempo Real por defecto
+    const memoriaGrafica = { labels: [], voltaje: [], corriente: [], potencia: [], energia: [], frecuencia: [], factor_potencia: [] };
+    
+    // Colores adaptados a la lectura, pero manteniendo legibilidad en fondo oscuro
+    const configGraficas = {
+        voltaje: { nombre: 'Voltaje (V)', color: '#3b82f6' }, 
+        corriente: { nombre: 'Corriente (A)', color: '#facc15' },
+        potencia: { nombre: 'Potencia (W)', color: '#fb923c' }, 
+        energia: { nombre: 'Energía (kWh)', color: '#34d399' },
+        frecuencia: { nombre: 'Frecuencia (Hz)', color: '#c084fc' }, 
+        factor_potencia: { nombre: 'Factor de Potencia', color: '#2dd4bf' }
+    };
+
+    // ==========================================
+    // AUTENTICACIÓN SIMPLIFICADA (CORREO/PASS)
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        await checkSession();
+      } catch (err) {
+        document.getElementById('splash-screen').classList.add('hidden');
+        document.getElementById('auth-screen').classList.remove('hidden');
+      }
+    });
+
+    async function checkSession() {
+      const { data: { session } } = await db.auth.getSession();
+      if (session) {
+        document.getElementById('auth-screen').classList.add('hidden');
+        document.getElementById('splash-screen').classList.add('hidden');
         
-        // Estado de los Filtros
-        let fFecha = '';
-        let fParam = 'created_at';
-        let fOrdenDesc = true;
+        document.getElementById('main-header').classList.remove('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+        document.getElementById('main-nav').classList.remove('hidden');
+        
+        iniciarApp();
+      } else {
+        document.getElementById('splash-screen').classList.add('hidden');
+        document.getElementById('auth-screen').classList.remove('hidden');
+      }
+    }
 
-        // Variables para Gráficas
-        let graficoPrincipal;
-        let parametroGrafico = 'voltaje';
-        let limiteGrafica = 60; // Por defecto Tiempo real
-        const memoriaGrafica = { labels: [], voltaje: [], corriente: [], potencia: [], energia: [], frecuencia: [], factor_potencia: [] };
-        const configGraficas = {
-            voltaje: { nombre: 'Voltaje (V)', color: '#007bff' }, corriente: { nombre: 'Corriente (A)', color: '#dc3545' },
-            potencia: { nombre: 'Potencia (W)', color: '#ffc107' }, energia: { nombre: 'Energía (kWh)', color: '#28a745' },
-            frecuencia: { nombre: 'Frecuencia (Hz)', color: '#17a2b8' }, factor_potencia: { nombre: 'Factor de Potencia', color: '#6f42c1' }
-        };
+    async function login() { 
+        const e = document.getElementById('auth-email').value.trim(); 
+        const p = document.getElementById('auth-pass').value; 
+        if(!e || !p) return alert('Ingresa correo y contraseña'); 
+        
+        document.getElementById('btn-login').innerText = "Cargando..."; 
+        const { error } = await db.auth.signInWithPassword({ email: e, password: p }); 
+        
+        if(error) { 
+            alert('Error: ' + error.message); 
+            document.getElementById('btn-login').innerText = "Iniciar Sesión"; 
+        } else { 
+            document.getElementById('splash-screen').classList.remove('hidden'); 
+            await checkSession(); 
+        } 
+    }
 
-        function switchTab(tabId, event) {
-            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            if(event) event.target.classList.add('active');
-        }
+    async function register() { 
+        const e = document.getElementById('auth-email').value.trim(); 
+        const p = document.getElementById('auth-pass').value; 
+        if(!e || !p) return alert('Ingresa datos.'); 
+        
+        document.getElementById('btn-register').innerText = "Creando..."; 
+        const { error } = await db.auth.signUp({ email: e, password: p }); 
+        
+        if(error) { 
+            alert('Error: ' + error.message); 
+        } else { 
+            alert('Registro exitoso. Inicia sesión.'); 
+        } 
+        document.getElementById('btn-register').innerText = "Crear Cuenta"; 
+    }
 
-        // ==========================================
-        // MÓDULO: FILTROS Y TABLA CON PAGINACIÓN DE SERVIDOR
-        // ==========================================
-        function aplicarFiltros() {
-            fFecha = document.getElementById('filtro-fecha').value;
-            fParam = document.getElementById('filtro-parametro').value;
-            fOrdenDesc = document.getElementById('filtro-orden').value === 'desc';
-            paginaActual = 1; 
-            cargarPaginaTabla();
-        }
+    async function logout() { 
+        await db.auth.signOut(); 
+        location.reload(); 
+    }
 
-        function limpiarFiltros() {
-            document.getElementById('filtro-fecha').value = '';
-            document.getElementById('filtro-parametro').value = 'created_at';
-            document.getElementById('filtro-orden').value = 'desc';
-            aplicarFiltros();
-        }
+    function contactarSoporte() { 
+        const email = document.getElementById('auth-email').value.trim(); 
+        let mensaje = "Hola, necesito ayuda con el Monitor MAGOM."; 
+        if (email) mensaje += ` Mi correo es: ${email}`; 
+        window.open(`https://wa.me/573012878516?text=${encodeURIComponent(mensaje)}`, '_blank'); 
+    }
 
-        function crearFilaHTML(datos) {
-            const fechaObj = new Date(datos.created_at);
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${fechaObj.toLocaleDateString()}</td>
-                <td>${fechaObj.toLocaleTimeString()}</td>
-                <td>${datos.voltaje}</td>
-                <td>${datos.corriente}</td>
-                <td>${datos.potencia}</td>
-                <td>${datos.energia}</td>
-                <td>${datos.frecuencia}</td>
-                <td>${datos.factor_potencia}</td>
-            `;
-            return tr;
-        }
+    // Funciones de Recuperación (Ocultar/Mostrar/Verificar)
+    async function solicitarRecuperacionOTP() { 
+        const email = document.getElementById('auth-email').value.trim(); 
+        if (!email) return alert('Escribe tu correo electrónico en la casilla primero.'); 
+        const confirmar = confirm(`¿Enviar código de recuperación a ${email}?`); 
+        if (!confirmar) return; 
+        
+        const { error } = await db.auth.resetPasswordForEmail(email); 
+        if (error) return alert('Error: ' + error.message); 
+        
+        alert('¡Código enviado!'); 
+        document.getElementById('auth-screen').classList.add('hidden'); 
+        document.getElementById('modal-recuperacion-otp').classList.remove('hidden'); 
+    }
+    
+    async function verificarYCambiarPassword() { 
+        const email = document.getElementById('auth-email').value.trim(); 
+        const token = document.getElementById('otp-codigo').value.trim(); 
+        const newPass = document.getElementById('otp-nueva-pass').value; 
+        if (token.length !== 8) return alert('El código debe tener 8 dígitos.'); 
+        if (!newPass || newPass.length < 6) return alert('Mínimo 6 caracteres.'); 
+        
+        const btn = document.getElementById('btn-confirmar-otp');
+        btn.innerText = "Verificando..."; 
+        
+        const { error: errorOtp } = await db.auth.verifyOtp({ email: email, token: token, type: 'recovery' }); 
+        if (errorOtp) { btn.innerText = "Verificar y Cambiar"; return alert('Error de código: ' + errorOtp.message); } 
+        
+        const { error: errorUpdate } = await db.auth.updateUser({ password: newPass }); 
+        if (errorUpdate) { btn.innerText = "Verificar y Cambiar"; return alert('Error de guardado: ' + errorUpdate.message); } 
+        
+        alert('¡Contraseña actualizada!'); 
+        location.reload();
+    }
+    
+    function cerrarRecuperacionOTP() { 
+        document.getElementById('modal-recuperacion-otp').classList.add('hidden'); 
+        document.getElementById('auth-screen').classList.remove('hidden'); 
+    }
 
-        async function cargarPaginaTabla() {
-            const inicio = (paginaActual - 1) * REGISTROS_POR_PAGINA;
-            const fin = inicio + REGISTROS_POR_PAGINA - 1;
-
-            // Solicitar conteo exacto para calcular la paginación correctamente
-            let query = supabaseClient.from('mediciones').select('*', { count: 'exact' });
-
-            if (fFecha) {
-                query = query.gte('created_at', `${fFecha}T00:00:00-05:00`)
-                             .lte('created_at', `${fFecha}T23:59:59-05:00`);
-            }
-
-            query = query.order(fParam, { ascending: !fOrdenDesc }).range(inicio, fin);
-
-            const { data, count } = await query;
-            const tbody = document.getElementById('tabla-body');
-            tbody.innerHTML = '';
-            
-            if (data) data.forEach(med => tbody.appendChild(crearFilaHTML(med)));
-
-            // Actualizar la barra de consola oscura
-            if(count !== null) {
-                totalRegistros = count;
-                totalPaginas = Math.ceil(totalRegistros / REGISTROS_POR_PAGINA) || 1;
-            }
-
-            document.getElementById('input-page').value = paginaActual;
-            document.getElementById('total-pages-info').innerText = `de ${totalPaginas}`;
-            document.getElementById('total-records-info').innerText = `${totalRegistros} registros`;
-            
-            document.getElementById('btn-prev').disabled = paginaActual === 1;
-            document.getElementById('btn-next').disabled = paginaActual >= totalPaginas;
-        }
-
-        function cambiarPagina(delta) {
-            paginaActual += delta;
-            cargarPaginaTabla();
-        }
-
-        function irAPagina(val) {
-            let p = parseInt(val);
-            if (p >= 1 && p <= totalPaginas) {
-                paginaActual = p;
-                cargarPaginaTabla();
-            } else {
-                document.getElementById('input-page').value = paginaActual; // Revertir si el valor es inválido
-            }
-        }
-
-        function cambiarFilas() {
-            REGISTROS_POR_PAGINA = parseInt(document.getElementById('select-rows').value);
-            paginaActual = 1;
-            cargarPaginaTabla();
-        }
-
-        // ==========================================
-        // MÓDULO: GRÁFICAS CON ZOOM Y PAN
-        // ==========================================
-        function inicializarGrafico() {
-            const ctx = document.getElementById('canvas-principal').getContext('2d');
-            const conf = configGraficas[parametroGrafico];
-            
-            if(graficoPrincipal) graficoPrincipal.destroy(); // Destruir gráfico anterior si existe
-
-            graficoPrincipal = new Chart(ctx, {
-                type: 'line',
-                data: { 
-                    labels: memoriaGrafica.labels, 
-                    datasets: [{ 
-                        label: conf.nombre, 
-                        data: memoriaGrafica[parametroGrafico], 
-                        borderColor: conf.color, 
-                        backgroundColor: conf.color + '33', 
-                        fill: true, 
-                        tension: 0.4,
-                        pointRadius: limiteGrafica > 100 ? 0 : 3 // Ocultar puntos si hay muchos datos para mejor rendimiento
-                    }] 
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    animation: { duration: 400 }, 
-                    scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } } },
-                    plugins: {
-                        zoom: {
-                            pan: { enabled: true, mode: 'x' }, // Habilitar arrastre horizontal
-                            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } // Habilitar scroll del ratón
-                        }
-                    }
-                }
-            });
-        }
-
-        function cambiarParametroGrafico(param, event) {
-            parametroGrafico = param;
-            const conf = configGraficas[param];
-            document.querySelectorAll('.btn-chart').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-
-            graficoPrincipal.data.datasets[0].label = conf.nombre;
-            graficoPrincipal.data.datasets[0].data = memoriaGrafica[param];
-            graficoPrincipal.data.datasets[0].borderColor = conf.color;
-            graficoPrincipal.data.datasets[0].backgroundColor = conf.color + '33';
-            graficoPrincipal.update();
-        }
-
-        async function cambiarRangoTiempo(rango, event) {
-            document.querySelectorAll('.btn-time').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-
-            // Determinar límite de consulta para evitar congelar el navegador
-            if(rango === 'realtime') limiteGrafica = 60;
-            if(rango === 'dia') limiteGrafica = 500;
-            if(rango === 'mes') limiteGrafica = 2000;
-            if(rango === 'ano') limiteGrafica = 5000;
-
-            await cargarMemoriaGrafica();
-        }
-
-        async function cargarMemoriaGrafica() {
-            const { data } = await supabaseClient
-                .from('mediciones')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(limiteGrafica);
-
-            // Limpiar memoria
-            for(let key in memoriaGrafica) memoriaGrafica[key] = [];
-
-            if (data) {
-                [...data].reverse().forEach(med => {
-                    const objFecha = new Date(med.created_at);
-                    // Si es tiempo real mostrar solo la hora. Si es más viejo, mostrar fecha y hora
-                    const etiqueta = limiteGrafica <= 60 ? objFecha.toLocaleTimeString() : objFecha.toLocaleString();
-                    
-                    memoriaGrafica.labels.push(etiqueta);
-                    memoriaGrafica.voltaje.push(med.voltaje); memoriaGrafica.corriente.push(med.corriente);
-                    memoriaGrafica.potencia.push(med.potencia); memoriaGrafica.energia.push(med.energia);
-                    memoriaGrafica.frecuencia.push(med.frecuencia); memoriaGrafica.factor_potencia.push(med.factor_potencia);
-                });
-            }
-            inicializarGrafico();
-        }
-
-        // ==========================================
-        // MÓDULO: TIEMPO REAL (WEBSOCKETS)
-        // ==========================================
-        function procesarNuevoDato(payload) {
-            const datos = payload.new;
-            const horaStr = new Date(datos.created_at).toLocaleTimeString();
-            
-            // 1. Tarjetas
-            document.getElementById('val-voltaje').innerText = datos.voltaje; document.getElementById('val-corriente').innerText = datos.corriente;
-            document.getElementById('val-potencia').innerText = datos.potencia; document.getElementById('val-energia').innerText = datos.energia;
-            document.getElementById('val-frecuencia').innerText = datos.frecuencia; document.getElementById('val-pf').innerText = datos.factor_potencia;
-
-            // 2. Tabla (Insertar dinámicamente si estamos en la vista predeterminada sin filtros)
-            if (paginaActual === 1 && fParam === 'created_at' && fOrdenDesc && !fFecha) {
-                const tbody = document.getElementById('tabla-body');
-                tbody.prepend(crearFilaHTML(datos));
-                if (tbody.children.length > REGISTROS_POR_PAGINA) tbody.removeChild(tbody.lastChild);
-                
-                // Actualizar contadores
-                totalRegistros++;
-                document.getElementById('total-records-info').innerText = `${totalRegistros} registros`;
-            }
-
-            // 3. Gráficas (Solo actualizar dinámicamente si estamos en modo "Tiempo Real")
-            if(limiteGrafica === 60) {
-                memoriaGrafica.labels.push(horaStr); memoriaGrafica.voltaje.push(datos.voltaje);
-                memoriaGrafica.corriente.push(datos.corriente); memoriaGrafica.potencia.push(datos.potencia);
-                memoriaGrafica.energia.push(datos.energia); memoriaGrafica.frecuencia.push(datos.frecuencia);
-                memoriaGrafica.factor_potencia.push(datos.factor_potencia);
-
-                if (memoriaGrafica.labels.length > limiteGrafica) {
-                    memoriaGrafica.labels.shift(); memoriaGrafica.voltaje.shift(); memoriaGrafica.corriente.shift();
-                    memoriaGrafica.potencia.shift(); memoriaGrafica.energia.shift(); memoriaGrafica.frecuencia.shift(); memoriaGrafica.factor_potencia.shift();
-                }
-                graficoPrincipal.update();
-            }
-            
-            statusDiv.innerText = "Última actualización: " + horaStr;
-        }
-
-        supabaseClient.channel('mediciones-channel').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, procesarNuevoDato).subscribe((status) => {
-            if(status === 'SUBSCRIBED') statusDiv.innerText = "Conectado y recibiendo datos con hora de red...";
-        });
-
-        // Arranque Inicial
+    // ==========================================
+    // NAVEGACIÓN Y CARGA DE VISTAS
+    // ==========================================
+    function iniciarApp() {
+        cambiarVista('realtime');
         cargarPaginaTabla();
         cargarMemoriaGrafica();
-    </script>
+        iniciarSuscripcionWebsocket();
+    }
+
+    function cambiarVista(vista) {
+        // Ocultar todas las secciones
+        document.querySelectorAll('.vista-seccion').forEach(el => el.classList.add('hidden'));
+        document.getElementById(`view-${vista}`).classList.remove('hidden');
+        
+        // Resetear botones del Nav Inferior
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.classList.remove('text-red-500');
+            btn.classList.add('text-slate-400');
+        });
+        
+        // Activar el botón seleccionado
+        if(document.getElementById(`nav-${vista}`)) {
+            document.getElementById(`nav-${vista}`).classList.remove('text-slate-400');
+            document.getElementById(`nav-${vista}`).classList.add('text-red-500');
+        }
+    }
+
+    // ==========================================
+    // MÓDULO: FILTROS Y TABLA
+    // ==========================================
+    function aplicarFiltros() {
+        fFecha = document.getElementById('filtro-fecha').value;
+        fParam = document.getElementById('filtro-parametro').value;
+        fOrdenDesc = document.getElementById('filtro-orden').value === 'desc';
+        paginaActual = 1; 
+        cargarPaginaTabla();
+    }
+
+    function limpiarFiltros() {
+        document.getElementById('filtro-fecha').value = '';
+        document.getElementById('filtro-parametro').value = 'created_at';
+        document.getElementById('filtro-orden').value = 'desc';
+        aplicarFiltros();
+    }
+
+    function crearFilaHTML(datos) {
+        const fechaObj = new Date(datos.created_at);
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/50 transition-colors";
+        tr.innerHTML = `
+            <td>${fechaObj.toLocaleDateString()}</td>
+            <td class="font-mono text-slate-400">${fechaObj.toLocaleTimeString()}</td>
+            <td class="font-bold">${datos.voltaje}</td>
+            <td class="font-bold">${datos.corriente}</td>
+            <td class="font-bold">${datos.potencia}</td>
+            <td class="font-bold text-emerald-400">${datos.energia}</td>
+            <td>${datos.frecuencia}</td>
+            <td>${datos.factor_potencia}</td>
+        `;
+        return tr;
+    }
+
+    async function cargarPaginaTabla() {
+        const inicio = (paginaActual - 1) * REGISTROS_POR_PAGINA;
+        const fin = inicio + REGISTROS_POR_PAGINA - 1;
+
+        let query = db.from('mediciones').select('*', { count: 'exact' });
+
+        if (fFecha) {
+            query = query.gte('created_at', `${fFecha}T00:00:00-05:00`)
+                         .lte('created_at', `${fFecha}T23:59:59-05:00`);
+        }
+
+        query = query.order(fParam, { ascending: !fOrdenDesc }).range(inicio, fin);
+
+        const { data, count } = await query;
+        const tbody = document.getElementById('tabla-body');
+        tbody.innerHTML = '';
+        
+        if (data && data.length > 0) {
+            data.forEach(med => tbody.appendChild(crearFilaHTML(med)));
+        } else {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-slate-500">No se encontraron registros.</td></tr>';
+        }
+
+        if(count !== null) {
+            totalRegistros = count;
+            totalPaginas = Math.ceil(totalRegistros / REGISTROS_POR_PAGINA) || 1;
+        }
+
+        document.getElementById('input-page').value = paginaActual;
+        document.getElementById('total-pages-info').innerText = `de ${totalPaginas}`;
+        document.getElementById('total-records-info').innerText = `${totalRegistros} registros`;
+        
+        document.getElementById('btn-prev').disabled = paginaActual === 1;
+        document.getElementById('btn-next').disabled = paginaActual >= totalPaginas;
+    }
+
+    function cambiarPagina(delta) {
+        paginaActual += delta;
+        cargarPaginaTabla();
+    }
+
+    function irAPagina(val) {
+        let p = parseInt(val);
+        if (p >= 1 && p <= totalPaginas) {
+            paginaActual = p;
+            cargarPaginaTabla();
+        } else {
+            document.getElementById('input-page').value = paginaActual; 
+        }
+    }
+
+    function cambiarFilas() {
+        REGISTROS_POR_PAGINA = parseInt(document.getElementById('select-rows').value);
+        paginaActual = 1;
+        cargarPaginaTabla();
+    }
+
+    // ==========================================
+    // MÓDULO: GRÁFICAS CON ZOOM/PAN
+    // ==========================================
+    function inicializarGrafico() {
+        const ctx = document.getElementById('canvas-principal').getContext('2d');
+        const conf = configGraficas[parametroGrafico];
+        
+        if(graficoPrincipal) graficoPrincipal.destroy();
+
+        graficoPrincipal = new Chart(ctx, {
+            type: 'line',
+            data: { 
+                labels: memoriaGrafica.labels, 
+                datasets: [{ 
+                    label: conf.nombre, 
+                    data: memoriaGrafica[parametroGrafico], 
+                    borderColor: conf.color, 
+                    backgroundColor: conf.color + '22', // Transparencia para fondo oscuro
+                    fill: true, 
+                    tension: 0.4,
+                    pointRadius: limiteGrafica > 100 ? 0 : 3, // Ocultar puntos si hay muchos datos
+                    borderWidth: 2
+                }] 
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                animation: { duration: 400 }, 
+                color: '#94a3b8', // Color texto ejes
+                scales: { 
+                    x: { ticks: { maxRotation: 45, minRotation: 45, color: '#94a3b8' }, grid: { color: '#334155' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                },
+                plugins: {
+                    legend: { labels: { color: '#f8fafc' } },
+                    zoom: {
+                        pan: { enabled: true, mode: 'x' },
+                        zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+                    }
+                }
+            }
+        });
+    }
+
+    function cambiarParametroGrafico(param, event) {
+        parametroGrafico = param;
+        const conf = configGraficas[param];
+        
+        // Estilos de botones
+        document.querySelectorAll('.btn-chart').forEach(btn => {
+            btn.classList.remove('active', 'bg-red-700', 'text-white', 'border-transparent');
+            btn.classList.add('bg-slate-700', 'text-slate-300', 'border-slate-600');
+        });
+        
+        event.target.classList.remove('bg-slate-700', 'text-slate-300', 'border-slate-600');
+        event.target.classList.add('active', 'bg-red-700', 'text-white', 'border-transparent');
+
+        graficoPrincipal.data.datasets[0].label = conf.nombre;
+        graficoPrincipal.data.datasets[0].data = memoriaGrafica[param];
+        graficoPrincipal.data.datasets[0].borderColor = conf.color;
+        graficoPrincipal.data.datasets[0].backgroundColor = conf.color + '22';
+        graficoPrincipal.update();
+    }
+
+    async function cambiarRangoTiempo(rango, event) {
+        document.querySelectorAll('.btn-time').forEach(btn => {
+            btn.classList.remove('active', 'bg-red-950/30', 'text-red-500', 'border-red-500');
+            btn.classList.add('bg-slate-900', 'text-slate-400', 'border-slate-600');
+        });
+        
+        event.target.classList.remove('bg-slate-900', 'text-slate-400', 'border-slate-600');
+        event.target.classList.add('active', 'bg-red-950/30', 'text-red-500', 'border-red-500');
+
+        if(rango === 'realtime') limiteGrafica = 60;
+        if(rango === 'dia') limiteGrafica = 500;
+        if(rango === 'mes') limiteGrafica = 2000;
+        if(rango === 'ano') limiteGrafica = 5000;
+
+        await cargarMemoriaGrafica();
+    }
+
+    async function cargarMemoriaGrafica() {
+        const { data } = await db
+            .from('mediciones')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(limiteGrafica);
+
+        // Limpiar
+        for(let key in memoriaGrafica) memoriaGrafica[key] = [];
+
+        if (data) {
+            [...data].reverse().forEach(med => {
+                const objFecha = new Date(med.created_at);
+                const etiqueta = limiteGrafica <= 60 ? objFecha.toLocaleTimeString() : objFecha.toLocaleString();
+                
+                memoriaGrafica.labels.push(etiqueta);
+                memoriaGrafica.voltaje.push(med.voltaje); 
+                memoriaGrafica.corriente.push(med.corriente);
+                memoriaGrafica.potencia.push(med.potencia); 
+                memoriaGrafica.energia.push(med.energia);
+                memoriaGrafica.frecuencia.push(med.frecuencia); 
+                memoriaGrafica.factor_potencia.push(med.factor_potencia);
+            });
+        }
+        inicializarGrafico();
+    }
+
+    // ==========================================
+    // WEBSOCKET (TIEMPO REAL)
+    // ==========================================
+    function iniciarSuscripcionWebsocket() {
+        db.channel('mediciones-channel')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, procesarNuevoDato)
+          .subscribe((status) => {
+              if(status === 'SUBSCRIBED') {
+                  document.getElementById('conexion-status').innerText = "Conectado. Recibiendo datos en tiempo real...";
+                  document.getElementById('conexion-status').classList.replace('text-emerald-400', 'text-emerald-500');
+              }
+          });
+    }
+
+    function procesarNuevoDato(payload) {
+        const datos = payload.new;
+        const horaStr = new Date(datos.created_at).toLocaleTimeString();
+        
+        // 1. Tarjetas Superiores
+        document.getElementById('val-voltaje').innerText = datos.voltaje; 
+        document.getElementById('val-corriente').innerText = datos.corriente;
+        document.getElementById('val-potencia').innerText = datos.potencia; 
+        document.getElementById('val-energia').innerText = datos.energia;
+        document.getElementById('val-frecuencia').innerText = datos.frecuencia; 
+        document.getElementById('val-pf').innerText = datos.factor_potencia;
+
+        // 2. Tabla (Si no hay filtros aplicados y está en la hoja 1)
+        if (paginaActual === 1 && fParam === 'created_at' && fOrdenDesc && !fFecha) {
+            const tbody = document.getElementById('tabla-body');
+            tbody.prepend(crearFilaHTML(datos));
+            if (tbody.children.length > REGISTROS_POR_PAGINA) tbody.removeChild(tbody.lastChild);
+            
+            totalRegistros++;
+            document.getElementById('total-records-info').innerText = `${totalRegistros} registros`;
+        }
+
+        // 3. Gráficas (Solo si está en vista "Tiempo Real")
+        if(limiteGrafica === 60) {
+            memoriaGrafica.labels.push(horaStr); 
+            memoriaGrafica.voltaje.push(datos.voltaje);
+            memoriaGrafica.corriente.push(datos.corriente); 
+            memoriaGrafica.potencia.push(datos.potencia);
+            memoriaGrafica.energia.push(datos.energia); 
+            memoriaGrafica.frecuencia.push(datos.frecuencia);
+            memoriaGrafica.factor_potencia.push(datos.factor_potencia);
+
+            if (memoriaGrafica.labels.length > limiteGrafica) {
+                memoriaGrafica.labels.shift(); memoriaGrafica.voltaje.shift(); memoriaGrafica.corriente.shift();
+                memoriaGrafica.potencia.shift(); memoriaGrafica.energia.shift(); memoriaGrafica.frecuencia.shift(); memoriaGrafica.factor_potencia.shift();
+            }
+            if(graficoPrincipal) graficoPrincipal.update();
+        }
+    }
+  </script>
 </body>
 </html>
