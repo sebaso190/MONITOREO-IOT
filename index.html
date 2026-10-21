@@ -164,7 +164,42 @@
             </div>
         </div>
     </section>
+  <!-- ================= NOTIFICADOR FLOTANTE (TOAST) ================= -->
+    <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
+    <!-- ================= VISTA 4: CONFIGURACIÓN DE ALERTAS ================= -->
+    <section id="view-settings" class="vista-seccion space-y-4 hidden">
+        <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+            <h2 class="text-xl font-black text-red-500 mb-2">Configuración de Alertas</h2>
+            <p class="text-[11px] text-slate-400 mb-6">Define los límites máximos y mínimos. Si el medidor sale de este rango, recibirás una alarma.</p>
+            
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-300">Voltaje Mínimo (V)</label>
+                        <input type="number" id="cfg-v-min" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white outline-none focus:border-red-500 mt-1">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-300">Voltaje Máximo (V)</label>
+                        <input type="number" id="cfg-v-max" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white outline-none focus:border-red-500 mt-1">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-300">Corriente Máx (A)</label>
+                        <input type="number" id="cfg-i-max" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white outline-none focus:border-red-500 mt-1">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-300">Potencia Máx (W)</label>
+                        <input type="number" id="cfg-p-max" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white outline-none focus:border-red-500 mt-1">
+                    </div>
+                </div>
+                
+                <button onclick="guardarConfiguracionAlertas()" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow mt-4">Guardar Configuración</button>
+            </div>
+        </div>
+    </section>
   </main>
 
   <!-- ================= NAV INFERIOR ================= -->
@@ -172,8 +207,11 @@
     <button onclick="cambiarVista('realtime')" id="nav-realtime" class="nav-btn text-red-500 flex flex-col items-center gap-1 font-bold transition-colors"><span class="text-xl">⚡</span><span>Monitoreo</span></button>
     <button onclick="cambiarVista('history')" id="nav-history" class="nav-btn text-slate-400 flex flex-col items-center gap-1 font-bold transition-colors"><span class="text-xl">📋</span><span>Historial</span></button>
     <button onclick="cambiarVista('charts')" id="nav-charts" class="nav-btn text-slate-400 flex flex-col items-center gap-1 font-bold transition-colors"><span class="text-xl">📈</span><span>Gráficas</span></button>
+    
+    <!-- El botón de Alertas ahora está correctamente adentro -->
+    <button onclick="cambiarVista('settings')" id="nav-settings" class="nav-btn text-slate-400 flex flex-col items-center gap-1 font-bold transition-colors"><span class="text-xl">⚙️</span><span>Alertas</span></button>
   </nav>
-
+  
   <script>
     // --- VARIABLES Y SUPABASE ---
     const SUPABASE_URL = 'https://jhhwfpdirkqknuepqpzv.supabase.co';
@@ -305,6 +343,9 @@
         document.getElementById('val-potencia').innerText = '0';
         document.getElementById('val-energia').innerText = '0';
         
+        // --- ESTA LÍNEA FALTABA ---
+        cargarConfiguracionAlertas(); 
+        
         cambiarVista('realtime');
         cargarPaginaTabla();
         cargarMemoriaGrafica();
@@ -407,19 +448,128 @@
     }
 
     let subChannel;
+    let subChannel;
     function iniciarSuscripcionWebsocket() {
         if(subChannel) db.removeChannel(subChannel);
-        subChannel = db.channel('mediciones-channel').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, (payload) => {
-            // Filtrar en el cliente: ignorar si el dato es de un equipo que no estoy viendo ahora mismo
-            if(payload.new.dispositivo_id !== activeDeviceId) return;
-            
-            const d = payload.new; const h = new Date(d.created_at).toLocaleTimeString();
-            document.getElementById('val-voltaje').innerText = d.voltaje; document.getElementById('val-corriente').innerText = d.corriente; document.getElementById('val-potencia').innerText = d.potencia; document.getElementById('val-energia').innerText = d.energia; document.getElementById('val-frecuencia').innerText = d.frecuencia; document.getElementById('val-pf').innerText = d.factor_potencia;
-            
-            if (paginaActual === 1 && fParam === 'created_at' && fOrdenDesc && !fFecha) { const tb = document.getElementById('tabla-body'); tb.prepend(crearFilaHTML(d)); if (tb.children.length > REGISTROS_POR_PAGINA) tb.removeChild(tb.lastChild); totalRegistros++; document.getElementById('total-records-info').innerText = `${totalRegistros} registros`; }
-            if(limiteGrafica === 60) { memoriaGrafica.labels.push(h); memoriaGrafica.voltaje.push(d.voltaje); memoriaGrafica.corriente.push(d.corriente); memoriaGrafica.potencia.push(d.potencia); memoriaGrafica.energia.push(d.energia); memoriaGrafica.frecuencia.push(d.frecuencia); memoriaGrafica.factor_potencia.push(d.factor_potencia); if (memoriaGrafica.labels.length > 60) { memoriaGrafica.labels.shift(); memoriaGrafica.voltaje.shift(); memoriaGrafica.corriente.shift(); memoriaGrafica.potencia.shift(); memoriaGrafica.energia.shift(); memoriaGrafica.frecuencia.shift(); memoriaGrafica.factor_potencia.shift(); } if(graficoPrincipal) graficoPrincipal.update(); }
-        }).subscribe((s) => { if(s === 'SUBSCRIBED') document.getElementById('conexion-status').innerText = "Conectado. Recibiendo datos en vivo del equipo..."; });
+        subChannel = db.channel('mediciones-channel')
+            // Llamamos a la nueva función separada cuando llega un dato
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mediciones' }, procesarNuevoDato)
+            .subscribe((s) => { 
+                if(s === 'SUBSCRIBED') {
+                    document.getElementById('conexion-status').innerText = "Conectado. Recibiendo datos en vivo del equipo...";
+                    reiniciarWatchdog(); // Arrancamos el cronómetro de 15 segundos al conectar
+                } 
+            });
     }
+
+    // === ESTA ES LA FUNCIÓN VITAL QUE TE FALTÓ INTEGRAR ===
+    function procesarNuevoDato(payload) {
+        // Ignorar si el dato es de otro medidor
+        if(payload.new.dispositivo_id !== activeDeviceId) return;
+        
+        const d = payload.new; 
+        
+        // 1. REINICIAMOS EL CRONÓMETRO DE DESCONEXIÓN (Watchdog)
+        reiniciarWatchdog();
+        
+        // 2. EVALUAMOS LOS LÍMITES PARA DISPARAR ALERTAS
+        if (d.voltaje === 0) mostrarAlertaToast("⚠️ <b>ALERTA CRÍTICA:</b> Voltaje en 0. Posible falla o corte de red.", "error");
+        else if (d.voltaje < configAlertas.v_min) mostrarAlertaToast(`⚠️ <b>Bajo Voltaje:</b> ${d.voltaje}V (Mínimo: ${configAlertas.v_min}V)`, "error");
+        else if (d.voltaje > configAlertas.v_max) mostrarAlertaToast(`⚠️ <b>Sobretensión:</b> ${d.voltaje}V (Máximo: ${configAlertas.v_max}V)`, "error");
+        
+        if (d.corriente > configAlertas.i_max) mostrarAlertaToast(`⚡ <b>Sobrecorriente:</b> ${d.corriente}A superó límite de ${configAlertas.i_max}A`, "error");
+        if (d.potencia > configAlertas.p_max) mostrarAlertaToast(`🔥 <b>Exceso Potencia:</b> ${d.potencia}W superó límite de ${configAlertas.p_max}W`, "error");
+
+        // 3. ACTUALIZAMOS LOS NÚMEROS EN PANTALLA
+        document.getElementById('val-voltaje').innerText = d.voltaje; 
+        document.getElementById('val-corriente').innerText = d.corriente; 
+        document.getElementById('val-potencia').innerText = d.potencia; 
+        document.getElementById('val-energia').innerText = d.energia; 
+        document.getElementById('val-frecuencia').innerText = d.frecuencia; 
+        document.getElementById('val-pf').innerText = d.factor_potencia;
+        
+        // 4. ACTUALIZAMOS LA TABLA SI ESTAMOS EN LA PRIMERA PÁGINA
+        if (paginaActual === 1 && fParam === 'created_at' && fOrdenDesc && !fFecha) { 
+            const tb = document.getElementById('tabla-body'); 
+            tb.prepend(crearFilaHTML(d)); 
+            if (tb.children.length > REGISTROS_POR_PAGINA) tb.removeChild(tb.lastChild); 
+            totalRegistros++; 
+            document.getElementById('total-records-info').innerText = `${totalRegistros} registros`; 
+        }
+    }
+
+    // ==========================================
+    // SISTEMA DE ALERTAS Y PERRO GUARDIÁN (WATCHDOG)
+    // ==========================================
+    let watchdogTimer = null;
+    let configAlertas = { v_min: 90, v_max: 250, i_max: 15, p_max: 3000 };
+    let alertaMostrada = false;
+
+    // 1. Mostrar Notificaciones Flotantes
+    function mostrarAlertaToast(mensaje, tipo = 'error') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        const bg = tipo === 'error' ? 'bg-red-600' : 'bg-amber-500';
+        toast.className = `${bg} text-white px-4 py-3 rounded-lg shadow-2xl font-bold text-sm transform transition-all duration-300 translate-x-full border border-white/20`;
+        toast.innerHTML = mensaje;
+        container.appendChild(toast);
+        
+        // Animar entrada
+        setTimeout(() => toast.classList.remove('translate-x-full'), 10);
+        // Desaparecer luego de 6 segundos
+        setTimeout(() => {
+            toast.classList.add('translate-x-full');
+            setTimeout(() => toast.remove(), 300);
+        }, 6000);
+    }
+
+    // 2. Cargar configuración de la BD
+    async function cargarConfiguracionAlertas() {
+        const { data } = await db.from('dispositivos').select('alert_v_min, alert_v_max, alert_i_max, alert_p_max').eq('id', activeDeviceId).single();
+        if (data) {
+            configAlertas = { v_min: data.alert_v_min, v_max: data.alert_v_max, i_max: data.alert_i_max, p_max: data.alert_p_max };
+            document.getElementById('cfg-v-min').value = data.alert_v_min;
+            document.getElementById('cfg-v-max').value = data.alert_v_max;
+            document.getElementById('cfg-i-max').value = data.alert_i_max;
+            document.getElementById('cfg-p-max').value = data.alert_p_max;
+        }
+    }
+
+    // 3. Guardar nueva configuración en la BD
+    async function guardarConfiguracionAlertas() {
+        const payload = {
+            alert_v_min: Number(document.getElementById('cfg-v-min').value),
+            alert_v_max: Number(document.getElementById('cfg-v-max').value),
+            alert_i_max: Number(document.getElementById('cfg-i-max').value),
+            alert_p_max: Number(document.getElementById('cfg-p-max').value)
+        };
+        const { error } = await db.from('dispositivos').update(payload).eq('id', activeDeviceId);
+        if (!error) {
+            configAlertas = payload;
+            mostrarAlertaToast("✅ Configuración guardada correctamente.", "success");
+        } else {
+            alert("Error al guardar: " + error.message);
+        }
+    }
+
+    // 4. Reiniciar el Watchdog cada vez que llega un dato sano
+    function reiniciarWatchdog() {
+        clearTimeout(watchdogTimer);
+        document.getElementById('conexion-status').innerText = "Conectado. Recibiendo datos en vivo del equipo...";
+        document.getElementById('conexion-status').classList.replace('text-rose-500', 'text-emerald-500');
+        document.getElementById('conexion-status').classList.replace('border-rose-500', 'border-slate-700');
+        
+        // Si no llegan datos en 15 segundos (3 ciclos fallidos), declarar equipo caído
+        watchdogTimer = setTimeout(() => {
+            document.getElementById('conexion-status').innerText = "⚠️ MÓDULO DESCONECTADO (Sin energía o red caída)";
+            document.getElementById('conexion-status').classList.replace('text-emerald-500', 'text-rose-500');
+            document.getElementById('conexion-status').classList.replace('border-slate-700', 'border-rose-500');
+            mostrarAlertaToast("❌ <b>Corte Detectado:</b> El módulo dejó de transmitir datos.", "error");
+        }, 15000);
+    }
+
+      
+    
   </script>
 </body>
 </html>
