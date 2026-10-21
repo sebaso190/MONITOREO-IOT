@@ -94,7 +94,11 @@
   <header class="p-4 bg-slate-800 border-b border-slate-700 sticky top-0 z-10 flex justify-between items-center shadow-md hidden" id="main-header">
     <div class="flex flex-col">
         <h1 class="font-black text-lg text-red-500 tracking-wider">MAGOM</h1>
-        <select id="device-selector" onchange="cambiarDispositivoActivo()" class="bg-transparent text-slate-300 text-[11px] font-bold outline-none cursor-pointer mt-1 border border-slate-600 rounded px-1 max-w-[130px]"></select>
+        <div class="flex items-center gap-1 mt-1">
+            <select id="device-selector" onchange="cambiarDispositivoActivo()" class="bg-slate-900 text-slate-300 text-[11px] font-bold outline-none cursor-pointer border border-slate-600 rounded py-1 px-1 max-w-[130px]"></select>
+            <button onclick="editarNombreEquipo()" class="text-xs text-blue-400 bg-blue-900/30 px-1.5 py-1 rounded border border-blue-800/50" title="Editar Nombre">✏️</button>
+            <button onclick="limpiarDatosEquipo()" class="text-xs text-rose-400 bg-rose-900/30 px-1.5 py-1 rounded border border-rose-800/50" title="Limpiar Historial">🗑️</button>
+        </div>
     </div>
     <div class="flex items-center gap-2">
        <button onclick="abrirModalEquipos()" class="text-xs bg-red-700 hover:bg-red-600 text-white px-2.5 py-1.5 rounded-lg font-bold shadow">+</button>
@@ -151,9 +155,9 @@
                 <button class="btn-chart text-sm bg-slate-700 text-slate-300 px-4 py-1.5 rounded-full font-bold border border-slate-600" onclick="cambiarParametroGrafico('energia', event)">Energía</button>
             </div>
             <div class="flex flex-wrap justify-center gap-2 mb-4 border-b border-slate-700 pb-4">
-                <button class="btn-time active text-xs border border-red-500 text-red-500 bg-red-950/30 px-3 py-1 rounded" onclick="cambiarRangoTiempo('realtime', event)">Tiempo Real</button>
-                <button class="btn-time text-xs border border-slate-600 text-slate-400 bg-slate-900 px-3 py-1 rounded" onclick="cambiarRangoTiempo('dia', event)">Último Día</button>
-                <button class="btn-time text-xs border border-slate-600 text-slate-400 bg-slate-900 px-3 py-1 rounded" onclick="cambiarRangoTiempo('mes', event)">Último Mes</button>
+                <button class="btn-time active text-xs border border-red-500 text-red-500 bg-red-950/30 px-3 py-1 rounded" onclick="cambiarRangoTiempo('dia', event)">Día</button>
+                <button class="btn-time text-xs border border-slate-600 text-slate-400 bg-slate-900 px-3 py-1 rounded" onclick="cambiarRangoTiempo('mes', event)">Mes</button>
+                <button class="btn-time text-xs border border-slate-600 text-slate-400 bg-slate-900 px-3 py-1 rounded" onclick="cambiarRangoTiempo('ano', event)">Año</button>
             </div>
             <div class="relative w-full h-[50vh] min-h-[350px]">
                 <canvas id="canvas-principal"></canvas>
@@ -354,12 +358,51 @@
         });
     }
     function cambiarParametroGrafico(p, e) { parametroGrafico = p; const conf = configGraficas[p]; document.querySelectorAll('.btn-chart').forEach(b => { b.classList.remove('active', 'bg-red-700', 'text-white', 'border-transparent'); b.classList.add('bg-slate-700', 'text-slate-300', 'border-slate-600'); }); e.target.classList.remove('bg-slate-700', 'text-slate-300', 'border-slate-600'); e.target.classList.add('active', 'bg-red-700', 'text-white', 'border-transparent'); graficoPrincipal.data.datasets[0].label = conf.nombre; graficoPrincipal.data.datasets[0].data = memoriaGrafica[p]; graficoPrincipal.data.datasets[0].borderColor = conf.color; graficoPrincipal.data.datasets[0].backgroundColor = conf.color + '22'; graficoPrincipal.update(); }
-    async function cambiarRangoTiempo(r, e) { document.querySelectorAll('.btn-time').forEach(b => { b.classList.remove('active', 'bg-red-950/30', 'text-red-500', 'border-red-500'); b.classList.add('bg-slate-900', 'text-slate-400', 'border-slate-600'); }); e.target.classList.remove('bg-slate-900', 'text-slate-400', 'border-slate-600'); e.target.classList.add('active', 'bg-red-950/30', 'text-red-500', 'border-red-500'); if(r === 'realtime') limiteGrafica = 60; if(r === 'dia') limiteGrafica = 500; if(r === 'mes') limiteGrafica = 2000; await cargarMemoriaGrafica(); }
+    // === NUEVAS FUNCIONES: Editar y Limpiar ===
+    async function editarNombreEquipo() {
+        const select = document.getElementById('device-selector');
+        const actual = select.options[select.selectedIndex].text;
+        const nuevo = prompt("Cambiar nombre del medidor:", actual);
+        if(nuevo && nuevo !== actual) {
+            const { error } = await db.from('dispositivos').update({nombre: nuevo}).eq('id', activeDeviceId);
+            if(!error) location.reload(); else alert("Error guardando nombre");
+        }
+    }
+
+    async function limpiarDatosEquipo() {
+        if(confirm("⚠️ ¿Estás seguro de eliminar TODO el historial de este medidor? Los contadores volverán a cero. Esta acción NO se puede deshacer.")) {
+            const { error } = await db.from('mediciones').delete().eq('dispositivo_id', activeDeviceId);
+            if(!error) { alert("Historial borrado."); location.reload(); } 
+            else { alert("Error al borrar: " + error.message); }
+        }
+    }
+
+    // === GRAFICAS: LLAMANDO A LA FUNCIÓN DE PROMEDIOS DE SUPABASE ===
+    let rangoGrafica = 'dia';
+    async function cambiarRangoTiempo(r, e) { 
+        document.querySelectorAll('.btn-time').forEach(b => { b.classList.remove('active', 'bg-red-950/30', 'text-red-500', 'border-red-500'); b.classList.add('bg-slate-900', 'text-slate-400', 'border-slate-600'); }); 
+        e.target.classList.remove('bg-slate-900', 'text-slate-400', 'border-slate-600'); e.target.classList.add('active', 'bg-red-950/30', 'text-red-500', 'border-red-500'); 
+        rangoGrafica = r; 
+        await cargarMemoriaGrafica(); 
+    }
     
     async function cargarMemoriaGrafica() {
-        const { data } = await db.from('mediciones').select('*').eq('dispositivo_id', activeDeviceId).order('created_at', { ascending: false }).limit(limiteGrafica);
+        // Pedimos a Supabase que haga el cálculo pesado usando nuestra función RPC
+        const { data, error } = await db.rpc('obtener_promedios', { p_dispositivo: activeDeviceId, p_rango: rangoGrafica });
+        
         for(let k in memoriaGrafica) memoriaGrafica[k] = [];
-        if (data) { [...data].reverse().forEach(m => { const d = new Date(m.created_at); memoriaGrafica.labels.push(limiteGrafica <= 60 ? d.toLocaleTimeString() : d.toLocaleString()); memoriaGrafica.voltaje.push(m.voltaje); memoriaGrafica.corriente.push(m.corriente); memoriaGrafica.potencia.push(m.potencia); memoriaGrafica.energia.push(m.energia); memoriaGrafica.frecuencia.push(m.frecuencia); memoriaGrafica.factor_potencia.push(m.factor_potencia); }); }
+        
+        if (data && !error) { 
+            data.forEach(m => { 
+                memoriaGrafica.labels.push(m.etiqueta); 
+                memoriaGrafica.voltaje.push(m.voltaje); 
+                memoriaGrafica.corriente.push(m.corriente); 
+                memoriaGrafica.potencia.push(m.potencia); 
+                memoriaGrafica.energia.push(m.energia); 
+                memoriaGrafica.frecuencia.push(m.frecuencia); 
+                memoriaGrafica.factor_potencia.push(m.factor_potencia); 
+            }); 
+        }
         inicializarGrafico();
     }
 
